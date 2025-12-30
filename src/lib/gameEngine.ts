@@ -101,9 +101,11 @@ export const TILE_SPRITES: Record<number, string> = {
 
 // Base tile to use under overlay tiles
 export const OVERLAY_BASE: Record<number, number> = {
-  [TILES.DOOR]: TILES.FLOOR,
-  [TILES.TABLE]: TILES.FLOOR,
-  [TILES.BRIDGE]: TILES.DIRT,
+  [TILES.WALL]: TILES.GRASS,   // Walls on grass by default
+  [TILES.DOOR]: TILES.FLOOR,   // Doors on floor
+  [TILES.TABLE]: TILES.FLOOR,  // Tables on floor
+  [TILES.WATER]: TILES.GRASS,  // Water on grass
+  [TILES.BRIDGE]: TILES.DIRT,  // Bridge on dirt
 };
 
 // Check if a tile is an overlay (needs base tile drawn first)

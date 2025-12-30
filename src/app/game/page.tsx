@@ -308,13 +308,16 @@ export default function GamePage() {
 
       if (!canvas || !ctx || !atlas || !state) return;
 
+      // Disable image smoothing for crisp pixel art
+      ctx.imageSmoothingEnabled = false;
+
       // Clear
       ctx.fillStyle = '#1a1a1a';
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-      // Calculate camera offset
-      const offsetX = CANVAS_WIDTH / 2 - state.camera.x * TILE_SIZE - TILE_SIZE / 2;
-      const offsetY = CANVAS_HEIGHT / 2 - state.camera.y * TILE_SIZE - TILE_SIZE / 2;
+      // Calculate camera offset - round to prevent subpixel gaps between tiles
+      const offsetX = Math.round(CANVAS_WIDTH / 2 - state.camera.x * TILE_SIZE - TILE_SIZE / 2);
+      const offsetY = Math.round(CANVAS_HEIGHT / 2 - state.camera.y * TILE_SIZE - TILE_SIZE / 2);
 
       // Draw tiles (layered: base first, then overlay)
       const { map } = state;
@@ -331,7 +334,7 @@ export default function GamePage() {
 
           const tile = map.tiles[y][x];
 
-          // Draw base tile first
+          // Always draw base tile first
           const baseTile = getBaseTile(tile);
           const baseSpriteName = TILE_SPRITES[baseTile];
           if (baseSpriteName && atlas.sprites.has(baseSpriteName)) {
@@ -341,7 +344,7 @@ export default function GamePage() {
             ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
           }
 
-          // Draw overlay tile on top if this is an overlay
+          // Draw overlay tile on top (with alpha transparency)
           if (isOverlayTile(tile)) {
             const overlaySpriteName = TILE_SPRITES[tile];
             if (overlaySpriteName && atlas.sprites.has(overlaySpriteName)) {
