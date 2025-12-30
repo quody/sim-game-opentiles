@@ -30,6 +30,8 @@ interface Player extends Entity {
   targetX: number;
   targetY: number;
   moveProgress: number;
+  queuedMoveX?: number;
+  queuedMoveY?: number;
 }
 
 interface Camera {
@@ -263,8 +265,13 @@ export default function GamePage() {
           player.y = player.gridY;
           player.isMoving = false;
         }
-      } else {
-        // Not moving - check for new movement input
+      }
+
+      // Check for new movement input
+      // Allow checking near the end of movement for smoother transitions, but don't interrupt early
+      const canAcceptInput = !isCurrentlyMoving || player.moveProgress >= 0.85;
+
+      if (canAcceptInput) {
         let dx = 0;
         let dy = 0;
 
@@ -280,17 +287,49 @@ export default function GamePage() {
           else if (dy === -1) player.direction = 'up';
           else if (dy === 1) player.direction = 'down';
 
-          // Try to move to new tile
-          const newX = player.gridX + dx;
-          const newY = player.gridY + dy;
+          // Calculate new position from current target
+          const baseX = player.targetX;
+          const baseY = player.targetY;
+          const newX = baseX + dx;
+          const newY = baseY + dy;
 
-          if (canMoveTo(map, newX, newY)) {
-            player.targetX = newX;
-            player.targetY = newY;
-            player.moveProgress = 0;
-            player.isMoving = true;
+          // Only queue a new movement if it's different from current target
+          const isDifferentTarget = newX !== player.targetX || newY !== player.targetY;
+
+          // If not moving, use gridX/gridY as base instead
+          if (!isCurrentlyMoving && (dx !== 0 || dy !== 0)) {
+            const newX = player.gridX + dx;
+            const newY = player.gridY + dy;
+
+            if (canMoveTo(map, newX, newY)) {
+              player.targetX = newX;
+              player.targetY = newY;
+              player.moveProgress = 0;
+              player.isMoving = true;
+            }
+          } else if (isCurrentlyMoving && isDifferentTarget && canMoveTo(map, newX, newY)) {
+            // Queue next movement - will start when current movement completes
+            // Store the queued direction
+            player.queuedMoveX = dx;
+            player.queuedMoveY = dy;
           }
         }
+      }
+
+      // Apply queued movement when current movement completes
+      if (!isCurrentlyMoving && player.queuedMoveX !== undefined && player.queuedMoveY !== undefined) {
+        const newX = player.gridX + player.queuedMoveX;
+        const newY = player.gridY + player.queuedMoveY;
+
+        if (canMoveTo(map, newX, newY)) {
+          player.targetX = newX;
+          player.targetY = newY;
+          player.moveProgress = 0;
+          player.isMoving = true;
+        }
+
+        player.queuedMoveX = undefined;
+        player.queuedMoveY = undefined;
       }
 
       // Update camera to follow player smoothly

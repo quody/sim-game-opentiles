@@ -63,7 +63,7 @@ export class Camera {
 
     applyTransform(ctx) {
         ctx.save();
-        ctx.translate(-Math.floor(this.x), -Math.floor(this.y));
+        ctx.translate(-this.x, -this.y);
     }
 
     resetTransform(ctx) {

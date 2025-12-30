@@ -163,6 +163,22 @@ closed big chest
 bounds:1472,3780,64,64
 closed wooden door front
 bounds:2888,1044,64,64
+day brick floor c
+bounds:4616,2124,64,64
+day brick floor e
+bounds:6560,2268,64,64
+day brick floor n
+bounds:3536,2628,64,64
+day brick floor ne
+bounds:2240,3060,64,64
+day brick floor ns
+bounds:6704,1908,64,64
+dusk dirt floor c
+bounds:800,1460,64,64
+dusk grass floor c
+bounds:2960,1908,64,64
+dusk plowed field c
+bounds:2240,252,64,64
 lit fort wall center
 bounds:4976,828,64,64
 lit fort wall flat
@@ -219,19 +235,9 @@ stone table
 bounds:6416,1692,64,64
 wooden table
 bounds:5288,3852,64,64
-day brick floor c
-bounds:4616,2124,64,64
-day brick floor e
-bounds:6560,2268,64,64
-day brick floor n
-bounds:3536,2628,64,64
-day brick floor ne
-bounds:2240,3060,64,64
-day brick floor ns
-bounds:6704,1908,64,64
-dusk grass floor c
-bounds:2960,1908,64,64
-dusk dirt floor c
-bounds:800,1460,64,64
-dusk plowed field c
-bounds:2240,252,64,64
+magic bag
+index:0
+bounds:5552,2772,64,64
+magic bag
+index:1
+bounds:1880,2412,64,64
