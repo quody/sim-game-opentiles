@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seed Breeder - Grid World Farming Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0a0a0a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        h1 {
+            color: #4a7c59;
+            font-size: 28px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            letter-spacing: 2px;
+        }
+
+        #gameCanvas {
+            border: 3px solid #4a7c59;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(74, 124, 89, 0.3);
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        #instructions {
+            color: #888;
+            font-size: 12px;
+            text-align: center;
+            max-width: 800px;
+            line-height: 1.6;
+        }
+
+        #instructions kbd {
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-family: monospace;
+            color: #fff;
+        }
+
+        #loadingScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a0a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #4a7c59;
+            font-size: 24px;
+            z-index: 100;
+            transition: opacity 0.5s ease-out;
+        }
+
+        #loadingScreen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loader {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #333;
+            border-top-color: #4a7c59;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingScreen">
+        <div class="loader"></div>
+        <div>Loading Seed Breeder...</div>
+        <div id="subtitle">Essence Synthesis & Farming Simulation</div>
+    </div>
+
+    <div id="gameContainer">
+        <h1>SEED BREEDER</h1>
+        <canvas id="gameCanvas"></canvas>
+        <div id="instructions">
+            <kbd>WASD</kbd> / <kbd>Arrow Keys</kbd> Move &nbsp;|&nbsp;
+            <kbd>E</kbd> / <kbd>Space</kbd> Interact &nbsp;|&nbsp;
+            <kbd>1-4</kbd> Time Speed &nbsp;|&nbsp;
+            <kbd>ESC</kbd> Close Menu &nbsp;|&nbsp;
+            <kbd>Ctrl+S</kbd> Save &nbsp;|&nbsp;
+            <kbd>Ctrl+L</kbd> Load
+        </div>
+    </div>
+
+    <script type="module">
+        import { Game } from './game/Game.js';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('gameCanvas');
+            const loadingScreen = document.getElementById('loadingScreen');
+
+            if (!canvas) {
+                console.error('Canvas element not found!');
+                return;
+            }
+
+            // Create and start the game
+            const game = new Game(canvas);
+
+            // Expose game instance for debugging
+            window.game = game;
+
+            // Add keyboard shortcuts for save/load
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 's') {
+                    e.preventDefault();
+                    game.save();
+                }
+                if (e.ctrlKey && e.key === 'l') {
+                    e.preventDefault();
+                    game.load();
+                }
+            });
+
+            // Hide loading screen
+            setTimeout(() => {
+                loadingScreen.classList.add('hidden');
+            }, 500);
+
+            // Start the game
+            game.start();
+
+            console.log('%cSeed Breeder', 'color: #4a7c59; font-size: 24px; font-weight: bold;');
+            console.log('%cGrid World Farming Simulation', 'color: #888; font-size: 14px;');
+            console.log('');
+            console.log('Controls:');
+            console.log('  WASD / Arrow Keys - Move');
+            console.log('  E / Space - Interact');
+            console.log('  1-4 - Time speed (Pause, Normal, Fast, Very Fast)');
+            console.log('  ESC - Close menus');
+            console.log('  Ctrl+S - Save game');
+            console.log('  Ctrl+L - Load game');
+        });
+    </script>
+</body>
+</html>

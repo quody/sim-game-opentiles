@@ -1,0 +1,237 @@
+custom_sprites.png
+size:8192,4096
+repeat:none
+adamantine wand
+bounds:2480,3564,64,64
+agate ring
+bounds:1448,1764,64,64
+aide
+index:0
+bounds:2384,1764,64,64
+aide
+index:1
+bounds:2408,3996,64,64
+albatross
+index:0
+bounds:6632,2772,64,64
+albatross
+index:1
+bounds:3320,2412,64,64
+aligned priest
+index:0
+bounds:2384,324,64,64
+aligned priest
+index:1
+bounds:6512,3708,64,64
+aluminum wand
+bounds:1952,324,64,64
+angel
+index:0
+bounds:800,3404,64,64
+angel
+index:1
+bounds:2960,684,64,64
+ape
+index:0
+bounds:3032,612,64,64
+ape
+index:1
+bounds:1088,2916,64,64
+apple
+bounds:4472,1692,64,64
+aquamarine pendant
+bounds:2888,108,64,64
+arch priest
+index:0
+bounds:4184,612,64,64
+arch priest
+index:1
+bounds:2168,1620,64,64
+archaeologist
+index:0
+bounds:4688,324,64,64
+archaeologist
+index:1
+bounds:3104,1692,64,64
+archmage
+index:0
+bounds:2264,3996,64,64
+archmage
+index:1
+bounds:5264,2844,64,64
+archon
+index:0
+bounds:2312,108,64,64
+archon
+index:1
+bounds:7736,3924,64,64
+asmodeus
+index:0
+bounds:8000,3276,64,64
+asmodeus
+index:1
+bounds:4688,2844,64,64
+assassin
+index:0
+bounds:7640,3276,64,64
+assassin
+index:1
+bounds:3392,1908,64,64
+baby bull
+index:0
+bounds:872,1892,64,64
+baby bull
+index:1
+bounds:3104,180,64,64
+baby crocodile
+index:0
+bounds:2168,36,64,64
+baby crocodile
+index:1
+bounds:7016,3636,64,64
+baby dairy cow
+index:0
+bounds:6416,2916,64,64
+baby dairy cow
+index:1
+bounds:3608,3132,64,64
+baby emu
+index:0
+bounds:5696,3204,64,64
+baby emu
+index:1
+bounds:2096,3420,64,64
+baby gray horse
+index:0
+bounds:2264,3636,64,64
+baby gray horse
+index:1
+bounds:4472,1908,64,64
+bandit
+index:0
+bounds:1736,1620,64,64
+bandit
+index:1
+bounds:152,3116,64,64
+barbarian
+index:0
+bounds:1520,1692,64,64
+barbarian
+index:1
+bounds:8000,3204,64,64
+barn cat
+index:0
+bounds:3824,3348,64,64
+barn cat
+index:1
+bounds:152,2396,64,64
+bed a
+bounds:368,3476,64,64
+bed b
+bounds:4544,2484,64,64
+board b
+bounds:5192,2556,64,64
+brass lantern
+bounds:7664,3996,64,64
+brass ring
+bounds:872,1172,64,64
+brass wand
+bounds:152,1316,64,64
+bridge e w
+bounds:4424,3564,64,64
+bridge n s
+bounds:872,2324,64,64
+cactus nw ne sw se
+bounds:5120,1404,64,64
+can of grease
+bounds:2312,828,64,64
+candle
+index:0
+bounds:5840,1188,64,64
+candle
+index:1
+bounds:5192,3492,64,64
+captain
+index:0
+bounds:2672,1476,64,64
+captain
+index:1
+bounds:3488,3780,64,64
+closed barrel
+bounds:800,2972,64,64
+closed big chest
+bounds:1472,3780,64,64
+closed wooden door front
+bounds:2888,1044,64,64
+lit fort wall center
+bounds:4976,828,64,64
+lit fort wall flat
+bounds:1448,36,64,64
+lit fort wall left down
+bounds:4760,2268,64,64
+lit fort wall left right
+bounds:4616,2988,64,64
+lit fort wall left right down
+bounds:1304,1692,64,64
+lit fort wall left right up
+bounds:1016,1748,64,64
+lit fort wall left right up down
+bounds:1232,36,64,64
+lit fort wall left up
+bounds:1376,3060,64,64
+lit fort wall left up down
+bounds:296,2468,64,64
+lit fort wall right down
+bounds:1304,3492,64,64
+lit fort wall right up
+bounds:3248,900,64,64
+lit fort wall right up down
+bounds:296,2468,64,64
+lit fort wall up down
+bounds:296,2468,64,64
+lit orange wall center
+bounds:872,452,64,64
+lit orange wall flat
+bounds:1232,756,64,64
+lit orange wall left down
+bounds:7784,3204,64,64
+lit orange wall left right
+bounds:2744,900,64,64
+lit orange wall left right down
+bounds:2960,1404,64,64
+lit orange wall left right up
+bounds:1664,3420,64,64
+lit orange wall left right up down
+bounds:5552,2844,64,64
+lit orange wall left up
+bounds:4400,2340,64,64
+lit orange wall left up down
+bounds:6416,2340,64,64
+lit orange wall right down
+bounds:5768,2412,64,64
+lit orange wall right up
+bounds:4976,2844,64,64
+lit orange wall right up down
+bounds:3608,1908,64,64
+lit orange wall up down
+bounds:8,236,64,64
+stone table
+bounds:6416,1692,64,64
+wooden table
+bounds:5288,3852,64,64
+day brick floor c
+bounds:4616,2124,64,64
+day brick floor e
+bounds:6560,2268,64,64
+day brick floor n
+bounds:3536,2628,64,64
+day brick floor ne
+bounds:2240,3060,64,64
+day brick floor ns
+bounds:6704,1908,64,64
+dusk grass floor c
+bounds:2960,1908,64,64
+dusk dirt floor c
+bounds:800,1460,64,64
+dusk plowed field c
+bounds:2240,252,64,64
