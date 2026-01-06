@@ -18,6 +18,12 @@ export default function Home() {
           >
             Game Demo
           </Link>
+          <Link
+            href="/world-generator"
+            className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors"
+          >
+            World Generator
+          </Link>
         </div>
       </main>
     </div>

@@ -2,6 +2,7 @@
 
 import type { Trouble, RealItem, Inventory } from './gameEngine';
 import { generateId, removeTrouble, removeRealItem, addRealItem, addTrouble } from './gameEngine';
+import { progressionSystem } from './progressionSystem';
 
 export type CombinableItem = Trouble | RealItem;
 
@@ -168,7 +169,10 @@ class CombiningSystem {
 
   canCombine(item1: CombinableItem, item2: CombinableItem): boolean {
     const key = this.getRecipeKey(item1.type, item2.type);
-    return this.recipes.has(key);
+    if (!this.recipes.has(key)) return false;
+
+    // Check if recipe is unlocked via progression
+    return progressionSystem.canCombineTypes(item1.type, item2.type);
   }
 
   combine(item1: CombinableItem, item2: CombinableItem): CombineResult | null {

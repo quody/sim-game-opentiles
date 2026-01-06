@@ -139,6 +139,24 @@ export interface Entity {
   animFrame: number;
 }
 
+// ===== PLAYER STATS =====
+
+export interface PlayerStats {
+  charisma: number; // 0-10
+}
+
+export function createPlayerStats(): PlayerStats {
+  return { charisma: 0 };
+}
+
+export function getCharismaModifier(charisma: number): number {
+  return Math.floor(charisma / 2); // 0->0, 2->1, 4->2, 6->3, 8->4, 10->5
+}
+
+export function rollD20(): number {
+  return Math.floor(Math.random() * 20) + 1;
+}
+
 export interface NPCTrouble {
   name: string;
   description: string;

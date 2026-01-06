@@ -18,6 +18,9 @@ import {
   removeRealItem,
   removeTrouble,
   getCauldronItems,
+  createPlayerStats,
+  getCharismaModifier,
+  rollD20,
   type SpriteAtlas,
   type GameMap,
   type Entity,
@@ -25,6 +28,7 @@ import {
   type Inventory,
   type Trouble,
   type RealItem,
+  type PlayerStats,
 } from '@/lib/gameEngine';
 import { combiningSystem, combineInCauldron } from '@/lib/combiningSystem';
 
@@ -49,6 +53,28 @@ interface Camera {
   y: number;
 }
 
+interface PriceOption {
+  coins: number;
+  dc: number;
+  disabled: boolean;
+}
+
+interface RollResult {
+  roll: number;
+  modifier: number;
+  total: number;
+  dc: number;
+  success: boolean;
+}
+
+function createPriceOptions(): PriceOption[] {
+  return [
+    { coins: 0, dc: 0, disabled: false },
+    { coins: 1, dc: 10, disabled: false },
+    { coins: 2, dc: 15, disabled: false },
+  ];
+}
+
 interface GameState {
   player: Player;
   camera: Camera;
@@ -67,6 +93,11 @@ interface GameState {
   offerNPC: NPC | null;
   fieldInteractions: Set<string>;
   npcsTalkedTo: Set<string>;
+  // Player stats
+  playerStats: PlayerStats;
+  // Negotiation state
+  offerPriceOptions: PriceOption[];
+  lastRoll: RollResult | null;
 }
 
 function createPlayer(x: number, y: number): Player {
@@ -144,6 +175,9 @@ export default function GamePage() {
           offerNPC: null,
           fieldInteractions: new Set(),
           npcsTalkedTo: new Set(),
+          playerStats: createPlayerStats(),
+          offerPriceOptions: createPriceOptions(),
+          lastRoll: null,
         };
 
         setLoading(false);
@@ -273,21 +307,56 @@ export default function GamePage() {
           // Select/deselect item at cursor
           if (items.length > 0 && state.offerCursor < items.length) {
             const itemId = items[state.offerCursor].id;
-            state.selectedOfferItem = state.selectedOfferItem === itemId ? null : itemId;
+            if (state.selectedOfferItem === itemId) {
+              state.selectedOfferItem = null;
+              // Reset price options when deselecting
+              state.offerPriceOptions = createPriceOptions();
+              state.lastRoll = null;
+            } else {
+              state.selectedOfferItem = itemId;
+              // Reset price options when selecting new item
+              state.offerPriceOptions = createPriceOptions();
+              state.lastRoll = null;
+            }
           }
-        } else if (key === 'g') {
-          // Give selected item
-          if (state.selectedOfferItem && state.offerNPC) {
+        } else if ((key === '1' || key === '2' || key === '3') && state.selectedOfferItem && state.offerNPC) {
+          // Negotiate price
+          e.preventDefault();
+          const optionIndex = parseInt(key) - 1;
+          const option = state.offerPriceOptions[optionIndex];
+
+          if (option.disabled) {
+            state.notification = 'That price was already rejected!';
+            state.notificationTimer = 2000;
+            return;
+          }
+
+          const roll = rollD20();
+          const modifier = getCharismaModifier(state.playerStats.charisma);
+          const total = roll + modifier;
+          const success = total >= option.dc;
+
+          state.lastRoll = { roll, modifier, total, dc: option.dc, success };
+
+          if (success) {
             const item = state.inventory.realItems.find(i => i.id === state.selectedOfferItem);
             if (item) {
               removeRealItem(state.inventory, item.id);
-              state.notification = `Gave ${item.name} to ${state.offerNPC.name}`;
-              state.notificationTimer = 3000;
+              state.inventory.gold += option.coins;
+              const coinText = option.coins === 0 ? 'for free' : `for ${option.coins} coin${option.coins > 1 ? 's' : ''}`;
+              state.notification = `Deal! Gave ${item.name} ${coinText}. (Rolled ${roll}+${modifier}=${total} vs DC ${option.dc})`;
+              state.notificationTimer = 4000;
               state.selectedOfferItem = null;
               state.offerCursor = 0;
+              state.offerPriceOptions = createPriceOptions();
+              state.lastRoll = null;
               state.activePanel = 'none';
               state.offerNPC = null;
             }
+          } else {
+            state.offerPriceOptions[optionIndex].disabled = true;
+            state.notification = `Rejected! Rolled ${roll}+${modifier}=${total} vs DC ${option.dc}`;
+            state.notificationTimer = 3000;
           }
         }
         return;
@@ -347,6 +416,8 @@ export default function GamePage() {
         state.activePanel = 'offer';
         state.selectedOfferItem = null;
         state.offerCursor = 0;
+        state.offerPriceOptions = createPriceOptions();
+        state.lastRoll = null;
         state.showOfferOption = false;
         state.dialogueNPC = null;
         state.dialogueIndex = 0;
@@ -548,7 +619,7 @@ export default function GamePage() {
         addRealItem(state.inventory, {
           name: 'Old Growth seed',
           description: 'A seed from the old fields. Holds ancient potential.',
-          stats: { yield: 2, hardiness: 2, speed: 2, efficiency: 3 },
+          stats: { yield: 1, hardiness: 1, speed: 1, efficiency: 1 },
           feature: tile === TILES.FIELD_DEAD ? 'Survivor' : null,
           color: '#6b5b4f',
         });
@@ -594,8 +665,8 @@ export default function GamePage() {
         }
       }
 
-      // Don't update player if in dialogue
-      if (state.dialogueNPC) return;
+      // Don't update player if in dialogue or panel is open
+      if (state.dialogueNPC || state.activePanel !== 'none') return;
 
       const { player, map } = state;
       const keys = keysRef.current;
@@ -1182,8 +1253,8 @@ export default function GamePage() {
     }
 
     function renderOfferPanel(ctx: CanvasRenderingContext2D, state: GameState) {
-      const panelWidth = 450;
-      const panelHeight = 400;
+      const panelWidth = 500;
+      const panelHeight = 450;
       const panelX = (CANVAS_WIDTH - panelWidth) / 2;
       const panelY = (CANVAS_HEIGHT - panelHeight) / 2;
 
@@ -1199,23 +1270,23 @@ export default function GamePage() {
       ctx.font = 'bold 18px monospace';
       ctx.textAlign = 'center';
       const npcName = state.offerNPC?.name || 'NPC';
-      ctx.fillText(`OFFER TO ${npcName.toUpperCase()}`, panelX + panelWidth / 2, panelY + 30);
+      ctx.fillText(`NEGOTIATE WITH ${npcName.toUpperCase()}`, panelX + panelWidth / 2, panelY + 30);
 
       // Instructions
       ctx.fillStyle = '#888888';
       ctx.font = '11px monospace';
-      ctx.fillText('W/S: navigate | E: select | G: give', panelX + panelWidth / 2, panelY + 48);
+      ctx.fillText('W/S: navigate | E: select item | 1-3: negotiate price', panelX + panelWidth / 2, panelY + 48);
 
       // Only show real items (seeds), not troubles
       const items = state.inventory.realItems.filter(i => i.count > 0);
 
-      let yOffset = 80;
+      let yOffset = 70;
 
       // Section header
       ctx.fillStyle = '#5cb85c';
       ctx.font = 'bold 12px monospace';
       ctx.textAlign = 'left';
-      ctx.fillText('● SEEDS (real items only)', panelX + 20, panelY + yOffset);
+      ctx.fillText('● SEEDS', panelX + 20, panelY + yOffset);
       yOffset += 20;
 
       if (items.length === 0) {
@@ -1226,7 +1297,7 @@ export default function GamePage() {
         ctx.fillText('  Explore fields to find seeds!', panelX + 20, panelY + yOffset);
       } else {
         // Draw items with cursor-based navigation
-        for (let i = 0; i < items.length; i++) {
+        for (let i = 0; i < Math.min(items.length, 5); i++) {
           const item = items[i];
           const isSelected = state.selectedOfferItem === item.id;
           const isCursor = state.offerCursor === i;
@@ -1259,15 +1330,78 @@ export default function GamePage() {
           // Stats
           ctx.fillStyle = '#555555';
           ctx.font = '10px monospace';
-          ctx.fillText(`Y:${item.stats.yield} H:${item.stats.hardiness} S:${item.stats.speed} E:${item.stats.efficiency}`, panelX + 220, panelY + yOffset);
+          ctx.fillText(`Y${item.stats.yield} H${item.stats.hardiness} S${item.stats.speed} E${item.stats.efficiency}`, panelX + 280, panelY + yOffset);
 
-          yOffset += 28;
+          yOffset += 26;
         }
       }
 
-      // Selected item section
-      yOffset = panelHeight - 80;
-      ctx.strokeStyle = '#555555';
+      // Divider
+      yOffset = 220;
+      ctx.strokeStyle = '#444444';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(panelX + 20, panelY + yOffset);
+      ctx.lineTo(panelX + panelWidth - 20, panelY + yOffset);
+      ctx.stroke();
+
+      // Price negotiation section
+      yOffset += 20;
+      ctx.fillStyle = '#c9a227';
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('NEGOTIATE PRICE:', panelX + 20, panelY + yOffset);
+
+      const modifier = getCharismaModifier(state.playerStats.charisma);
+      ctx.fillStyle = '#888888';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`Your modifier: +${modifier}`, panelX + panelWidth - 20, panelY + yOffset);
+
+      yOffset += 25;
+
+      if (state.selectedOfferItem) {
+        // Show price options
+        for (let i = 0; i < state.offerPriceOptions.length; i++) {
+          const option = state.offerPriceOptions[i];
+          const label = option.coins === 0 ? 'Free (always works)' :
+                       `${option.coins} coin${option.coins > 1 ? 's' : ''} (DC ${option.dc})`;
+
+          if (option.disabled) {
+            ctx.fillStyle = '#553333';
+            ctx.font = '12px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`[${i + 1}] ${label} - REJECTED`, panelX + 30, panelY + yOffset);
+          } else {
+            ctx.fillStyle = '#5cb85c';
+            ctx.font = '12px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`[${i + 1}] ${label}`, panelX + 30, panelY + yOffset);
+          }
+          yOffset += 22;
+        }
+
+        // Show last roll result
+        if (state.lastRoll) {
+          yOffset += 10;
+          const roll = state.lastRoll;
+          const resultColor = roll.success ? '#5cb85c' : '#d9534f';
+          const resultText = roll.success ? 'SUCCESS' : 'FAILED';
+          ctx.fillStyle = resultColor;
+          ctx.font = 'bold 11px monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText(`Last roll: ${roll.roll} + ${roll.modifier} = ${roll.total} vs DC ${roll.dc} → ${resultText}`, panelX + 30, panelY + yOffset);
+        }
+      } else {
+        ctx.fillStyle = '#666666';
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('Select an item first...', panelX + 30, panelY + yOffset);
+      }
+
+      // Charisma display at bottom
+      yOffset = panelHeight - 60;
+      ctx.strokeStyle = '#444444';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(panelX + 20, panelY + yOffset);
@@ -1275,24 +1409,14 @@ export default function GamePage() {
       ctx.stroke();
 
       yOffset += 20;
-      if (state.selectedOfferItem) {
-        const selectedItem = items.find(i => i.id === state.selectedOfferItem);
-        if (selectedItem) {
-          ctx.fillStyle = '#c9a227';
-          ctx.font = '14px monospace';
-          ctx.textAlign = 'left';
-          ctx.fillText(`Give: ${selectedItem.name}`, panelX + 20, panelY + yOffset);
-          yOffset += 25;
-          ctx.fillStyle = '#5cb85c';
-          ctx.font = 'bold 12px monospace';
-          ctx.fillText(`[G] Give to ${npcName}`, panelX + 20, panelY + yOffset);
-        }
-      } else {
-        ctx.fillStyle = '#666666';
-        ctx.font = '12px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText('Select an item to offer...', panelX + 20, panelY + yOffset);
-      }
+      ctx.fillStyle = '#aa66cc';
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`Charisma: ${state.playerStats.charisma} (+${modifier} modifier)`, panelX + 20, panelY + yOffset);
+
+      ctx.fillStyle = '#ffd700';
+      ctx.textAlign = 'right';
+      ctx.fillText(`Gold: ${state.inventory.gold}`, panelX + panelWidth - 20, panelY + yOffset);
 
       // Close hint
       ctx.fillStyle = '#666666';
