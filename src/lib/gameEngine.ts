@@ -78,12 +78,15 @@ export const TILES = {
   DIRT: 1,
   FLOOR: 2,
   PLOWED: 3,
+  FIELD_EMPTY: 4,
+  FIELD_DEAD: 5,
   // Overlay tiles (drawn on top of base)
   WALL: 10,
   DOOR: 11,
   TABLE: 12,
   WATER: 13,
   BRIDGE: 14,
+  CAULDRON: 15,
 } as const;
 
 // Map tile type to sprite name
@@ -92,11 +95,14 @@ export const TILE_SPRITES: Record<number, string> = {
   [TILES.DIRT]: 'dusk dirt floor c',
   [TILES.FLOOR]: 'day brick floor c',
   [TILES.PLOWED]: 'dusk plowed field c',
+  [TILES.FIELD_EMPTY]: 'dusk dirt floor c',
+  [TILES.FIELD_DEAD]: 'dusk dirt floor c',
   [TILES.WALL]: 'lit orange wall center',
   [TILES.DOOR]: 'closed wooden door front',
   [TILES.TABLE]: 'wooden table',
   [TILES.WATER]: 'lit fort wall center',
   [TILES.BRIDGE]: 'bridge n s',
+  [TILES.CAULDRON]: 'can of grease',
 };
 
 // Base tile to use under overlay tiles
@@ -106,6 +112,7 @@ export const OVERLAY_BASE: Record<number, number> = {
   [TILES.TABLE]: TILES.FLOOR,  // Tables on floor
   [TILES.WATER]: TILES.GRASS,  // Water on grass
   [TILES.BRIDGE]: TILES.DIRT,  // Bridge on dirt
+  [TILES.CAULDRON]: TILES.FLOOR, // Cauldron on floor
 };
 
 // Check if a tile is an overlay (needs base tile drawn first)
@@ -132,9 +139,19 @@ export interface Entity {
   animFrame: number;
 }
 
+export interface NPCTrouble {
+  name: string;
+  description: string;
+  severity: number;
+  statModifiers: Record<string, number>;
+  grantsFeature: string | null;
+  color: string;
+}
+
 export interface NPC extends Entity {
   name: string;
   dialogue: string[];
+  trouble?: NPCTrouble;
 }
 
 export interface GameMap {
@@ -143,6 +160,112 @@ export interface GameMap {
   tiles: number[][];
   npcs: NPC[];
   spawn: { x: number; y: number };
+}
+
+// ===== INVENTORY TYPES =====
+
+export interface Trouble {
+  id: string;
+  type: 'trouble';
+  name: string;
+  description: string;
+  severity: number;
+  statModifiers: Record<string, number>;
+  grantsFeature: string | null;
+  color: string;
+  count: number;
+}
+
+export interface RealItem {
+  id: string;
+  type: 'seed';
+  name: string;
+  description: string;
+  stats: { yield: number; hardiness: number; speed: number; efficiency: number };
+  feature: string | null;
+  color: string;
+  count: number;
+}
+
+export interface Inventory {
+  troubles: Trouble[];
+  realItems: RealItem[];
+  gold: number;
+}
+
+export function createInventory(): Inventory {
+  return {
+    troubles: [],
+    realItems: [],
+    gold: 50,
+  };
+}
+
+export function generateId(): string {
+  return Math.random().toString(36).substring(2, 9);
+}
+
+export function addTrouble(inventory: Inventory, trouble: Omit<Trouble, 'id' | 'type' | 'count'>): Trouble {
+  const existing = inventory.troubles.find(t => t.name === trouble.name);
+  if (existing) {
+    existing.count++;
+    return existing;
+  }
+  const newTrouble: Trouble = {
+    ...trouble,
+    id: generateId(),
+    type: 'trouble',
+    count: 1,
+  };
+  inventory.troubles.push(newTrouble);
+  return newTrouble;
+}
+
+export function addRealItem(inventory: Inventory, item: Omit<RealItem, 'id' | 'type' | 'count'>): RealItem {
+  const existing = inventory.realItems.find(i => i.name === item.name);
+  if (existing) {
+    existing.count++;
+    return existing;
+  }
+  const newItem: RealItem = {
+    ...item,
+    id: generateId(),
+    type: 'seed',
+    count: 1,
+  };
+  inventory.realItems.push(newItem);
+  return newItem;
+}
+
+export function removeTrouble(inventory: Inventory, troubleId: string): boolean {
+  const trouble = inventory.troubles.find(t => t.id === troubleId);
+  if (!trouble) return false;
+  trouble.count--;
+  if (trouble.count <= 0) {
+    inventory.troubles = inventory.troubles.filter(t => t.id !== troubleId);
+  }
+  return true;
+}
+
+export function removeRealItem(inventory: Inventory, itemId: string): boolean {
+  const item = inventory.realItems.find(i => i.id === itemId);
+  if (!item) return false;
+  item.count--;
+  if (item.count <= 0) {
+    inventory.realItems = inventory.realItems.filter(i => i.id !== itemId);
+  }
+  return true;
+}
+
+export function getCauldronItems(inventory: Inventory): (Trouble | RealItem)[] {
+  const items: (Trouble | RealItem)[] = [];
+  for (const trouble of inventory.troubles) {
+    if (trouble.count > 0) items.push(trouble);
+  }
+  for (const item of inventory.realItems) {
+    if (item.count > 0) items.push(item);
+  }
+  return items;
 }
 
 export function createDefaultMap(): GameMap {
@@ -188,9 +311,10 @@ export function createDefaultMap(): GameMap {
   }
   tiles[7][5] = TILES.DOOR;
 
-  // Add some tables inside
+  // Add tables and cauldron inside (the magic bench!)
   tiles[4][5] = TILES.TABLE;
   tiles[5][4] = TILES.TABLE;
+  tiles[5][6] = TILES.CAULDRON;  // The magic cauldron
 
   // Create another building
   for (let y = 3; y < 8; y++) {
@@ -207,10 +331,15 @@ export function createDefaultMap(): GameMap {
   // Add bridge
   tiles[10][12] = TILES.BRIDGE;
 
-  // Hobbs Farm area (right side) - plowed fields
+  // Hobbs Farm area (right side) - dead and empty fields
   for (let y = 13; y < 18; y++) {
     for (let x = 17; x < 23; x++) {
-      tiles[y][x] = TILES.PLOWED;
+      // Mix of dead fields and empty plantable fields
+      if (y === 13 || y === 17) {
+        tiles[y][x] = TILES.FIELD_EMPTY;  // Empty fields for planting
+      } else {
+        tiles[y][x] = TILES.FIELD_DEAD;   // Dead fields from drought
+      }
     }
   }
 
@@ -269,6 +398,14 @@ export function createDefaultMap(): GameMap {
         'That row there. Give me one row. One season.',
         "Don't expect payment if it fails like everything else.",
       ],
+      trouble: {
+        name: 'Seeds dry out',
+        description: 'The drought plaguing these eastern hills. Seeds must be hardy to survive.',
+        severity: 2,
+        statModifiers: { hardiness: 2 },
+        grantsFeature: 'Drought Resistant',
+        color: '#d4a574',
+      },
     },
   ];
 
@@ -282,7 +419,7 @@ export function createDefaultMap(): GameMap {
 }
 
 export function isSolidTile(tile: number): boolean {
-  return tile === TILES.WALL || tile === TILES.TABLE || tile === TILES.WATER;
+  return tile === TILES.WALL || tile === TILES.TABLE || tile === TILES.WATER || tile === TILES.CAULDRON;
 }
 
 export function getTile(map: GameMap, x: number, y: number): number {
