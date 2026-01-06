@@ -60,7 +60,9 @@ export const TILES = {
     BENCH: 13,
     CHAMBER: 14,
     STORAGE: 15,
-    NOTICE_BOARD: 16
+    NOTICE_BOARD: 16,
+    CAULDRON: 17,
+    TABLE: 18
 };
 
 // Interaction distances

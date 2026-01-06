@@ -20,6 +20,9 @@ export class UI {
         // Stabilization state
         this.stabilizingSeeds = [];
 
+        // Cauldron state
+        this.selectedCauldronItems = [];
+
         // Buttons for mouse interaction
         this.buttons = [];
     }
@@ -64,6 +67,7 @@ export class UI {
         this.activePanel = null;
         this.selectedSeedForExtract = null;
         this.selectedEssences = [];
+        this.selectedCauldronItems = [];
         this.game.timeSystem.resume();
     }
 
@@ -86,6 +90,15 @@ export class UI {
     showPlantingMenu(x, y) {
         this.plantingPosition = { x, y };
         this.showPanel('planting');
+    }
+
+    showCauldron() {
+        this.selectedCauldronItems = [];
+        this.showPanel('cauldron');
+    }
+
+    showInventory() {
+        this.showPanel('inventory');
     }
 
     // Input handling for UI
@@ -121,6 +134,7 @@ export class UI {
             if (input.isKeyJustPressed('Digit3')) this.game.timeSystem.setSpeed(TIME_SPEEDS.FAST);
             if (input.isKeyJustPressed('Digit4')) this.game.timeSystem.setSpeed(TIME_SPEEDS.VERY_FAST);
             if (input.isKeyJustPressed('Space')) this.game.timeSystem.togglePause();
+            if (input.isKeyJustPressed('KeyI')) this.showInventory();
         }
 
         // Handle button clicks
@@ -170,6 +184,13 @@ export class UI {
                     }
                 }
                 break;
+
+            case 'cauldron':
+                // C to combine when 2 items selected
+                if (input.isKeyJustPressed('KeyC') && this.selectedCauldronItems.length === 2) {
+                    this.combineCauldronItems();
+                }
+                break;
         }
     }
 
@@ -206,6 +227,27 @@ export class UI {
 
             // Auto-show prompt to stabilize
             this.game.questSystem.completeObjective('prove_seeds', 'create_seed');
+        }
+    }
+
+    combineCauldronItems() {
+        const inv = this.game.inventory;
+
+        if (this.selectedCauldronItems.length !== 2) {
+            this.showNotification('Select exactly 2 items to combine!');
+            return;
+        }
+
+        const result = inv.combineInCauldron(
+            this.selectedCauldronItems[0],
+            this.selectedCauldronItems[1]
+        );
+
+        if (result) {
+            this.showNotification(`Created: ${result.name}!`);
+            this.selectedCauldronItems = [];
+        } else {
+            this.showNotification('These items cannot be combined!');
         }
     }
 
@@ -362,7 +404,7 @@ export class UI {
         // Controls hint
         ctx.textAlign = 'right';
         ctx.fillStyle = '#888888';
-        ctx.fillText('WASD: Move | E: Interact | ESC: Close', CANVAS_WIDTH - 10, barY + 25);
+        ctx.fillText('WASD: Move | E: Interact | I: Inventory | ESC: Close', CANVAS_WIDTH - 10, barY + 25);
     }
 
     renderNotifications(ctx) {
@@ -414,6 +456,12 @@ export class UI {
                 break;
             case 'planting':
                 this.renderPlantingMenu(ctx, panelX, panelY, panelW, panelH);
+                break;
+            case 'cauldron':
+                this.renderCauldron(ctx, panelX, panelY, panelW, panelH);
+                break;
+            case 'inventory':
+                this.renderInventory(ctx, panelX, panelY, panelW, panelH);
                 break;
         }
 
@@ -790,6 +838,306 @@ export class UI {
         ctx.fillStyle = '#888888';
         ctx.font = '11px monospace';
         ctx.fillText('This field will take 1 season to grow.', x + 20, y + h - 20);
+    }
+
+    renderCauldron(ctx, x, y, w, h) {
+        const inv = this.game.inventory;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 18px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('MAGIC CAULDRON', x + 20, y + 35);
+
+        ctx.font = '12px monospace';
+        ctx.fillStyle = '#aaaaaa';
+        ctx.fillText('Combine Troubles with Seeds to create specialized seeds', x + 20, y + 55);
+
+        // Get all cauldron items (troubles + real items)
+        const cauldronItems = inv.getCauldronItems();
+
+        // === LEFT SIDE: Available Items ===
+        ctx.font = 'bold 14px monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('AVAILABLE ITEMS:', x + 20, y + 85);
+
+        let itemY = y + 110;
+
+        if (cauldronItems.length === 0) {
+            ctx.fillStyle = '#666666';
+            ctx.font = '12px monospace';
+            ctx.fillText('No items available.', x + 30, itemY);
+            ctx.fillText('Talk to NPCs to get Troubles.', x + 30, itemY + 20);
+            ctx.fillText('Interact with fields to find seeds.', x + 30, itemY + 40);
+        } else {
+            cauldronItems.forEach((item, i) => {
+                const isSelected = this.selectedCauldronItems.includes(item.id);
+
+                // Item card background
+                ctx.fillStyle = isSelected ? '#4a3a8a' : (item.type === 'trouble' ? '#4a2020' : '#2a4a2a');
+                ctx.fillRect(x + 20, itemY, 280, 55);
+
+                // Border if selected
+                if (isSelected) {
+                    ctx.strokeStyle = '#9966ff';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x + 20, itemY, 280, 55);
+                }
+
+                // Type indicator
+                ctx.fillStyle = item.type === 'trouble' ? '#ff6666' : '#66ff66';
+                ctx.font = 'bold 10px monospace';
+                ctx.fillText(item.type.toUpperCase(), x + 30, itemY + 15);
+
+                // Item name
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px monospace';
+                ctx.fillText(item.name, x + 30, itemY + 32);
+
+                // Item details
+                ctx.font = '10px monospace';
+                ctx.fillStyle = '#aaaaaa';
+                if (item.type === 'trouble') {
+                    ctx.fillText(`Severity: ${item.severity || 1} | ${item.grantsFeature || item.description?.substring(0, 30) || ''}`, x + 30, itemY + 48);
+                } else {
+                    ctx.fillText(`Hrd: ${item.stats?.hardiness || '?'} | ${item.feature || 'no feature'}`, x + 30, itemY + 48);
+                }
+
+                // Count badge
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '10px monospace';
+                ctx.textAlign = 'right';
+                ctx.fillText(`x${item.count || 1}`, x + 290, itemY + 15);
+                ctx.textAlign = 'left';
+
+                // Click to select
+                this.buttons.push({
+                    x: x + 20,
+                    y: itemY,
+                    width: 280,
+                    height: 55,
+                    onClick: () => {
+                        if (isSelected) {
+                            this.selectedCauldronItems = this.selectedCauldronItems.filter(id => id !== item.id);
+                        } else if (this.selectedCauldronItems.length < 2) {
+                            this.selectedCauldronItems.push(item.id);
+                        }
+                    }
+                });
+
+                itemY += 60;
+            });
+        }
+
+        // === RIGHT SIDE: Combination Preview ===
+        ctx.font = 'bold 14px monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('COMBINE:', x + 330, y + 85);
+
+        // Selected items display
+        const slot1Y = y + 110;
+        const slot2Y = y + 175;
+
+        // Slot 1
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(x + 330, slot1Y, 200, 55);
+        if (this.selectedCauldronItems[0]) {
+            const item1 = inv.getTroubleById(this.selectedCauldronItems[0]) || inv.getRealItemById(this.selectedCauldronItems[0]);
+            if (item1) {
+                ctx.fillStyle = item1.type === 'trouble' ? '#ff6666' : '#66ff66';
+                ctx.font = 'bold 10px monospace';
+                ctx.fillText(item1.type.toUpperCase(), x + 340, slot1Y + 20);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px monospace';
+                ctx.fillText(item1.name, x + 340, slot1Y + 40);
+            }
+        } else {
+            ctx.fillStyle = '#666666';
+            ctx.font = '12px monospace';
+            ctx.fillText('Select first item...', x + 340, slot1Y + 35);
+        }
+
+        // Plus sign
+        ctx.fillStyle = '#9966ff';
+        ctx.font = 'bold 24px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('+', x + 430, slot1Y + 75);
+        ctx.textAlign = 'left';
+
+        // Slot 2
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(x + 330, slot2Y, 200, 55);
+        if (this.selectedCauldronItems[1]) {
+            const item2 = inv.getTroubleById(this.selectedCauldronItems[1]) || inv.getRealItemById(this.selectedCauldronItems[1]);
+            if (item2) {
+                ctx.fillStyle = item2.type === 'trouble' ? '#ff6666' : '#66ff66';
+                ctx.font = 'bold 10px monospace';
+                ctx.fillText(item2.type.toUpperCase(), x + 340, slot2Y + 20);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px monospace';
+                ctx.fillText(item2.name, x + 340, slot2Y + 40);
+            }
+        } else {
+            ctx.fillStyle = '#666666';
+            ctx.font = '12px monospace';
+            ctx.fillText('Select second item...', x + 340, slot2Y + 35);
+        }
+
+        // === RESULT PREVIEW ===
+        if (this.selectedCauldronItems.length === 2) {
+            const prediction = inv.predictCauldronCombination(
+                this.selectedCauldronItems[0],
+                this.selectedCauldronItems[1]
+            );
+
+            ctx.fillStyle = '#222244';
+            ctx.fillRect(x + 330, slot2Y + 70, 200, 80);
+
+            if (prediction && prediction.canCombine) {
+                ctx.fillStyle = '#9966ff';
+                ctx.font = 'bold 12px monospace';
+                ctx.fillText('RESULT PREVIEW:', x + 340, slot2Y + 90);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '11px monospace';
+                ctx.fillText(`Name: ${prediction.possibleName}`, x + 340, slot2Y + 110);
+                ctx.fillText(`Type: ${prediction.resultType}`, x + 340, slot2Y + 125);
+
+                // Combine button
+                ctx.fillStyle = COLORS.BUTTON;
+                ctx.fillRect(x + 340, slot2Y + 135, 180, 25);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('[C] COMBINE', x + 430, slot2Y + 152);
+                ctx.textAlign = 'left';
+
+                this.buttons.push({
+                    x: x + 340,
+                    y: slot2Y + 135,
+                    width: 180,
+                    height: 25,
+                    onClick: () => this.combineCauldronItems()
+                });
+            } else {
+                ctx.fillStyle = '#ff6666';
+                ctx.font = '12px monospace';
+                ctx.fillText('Cannot combine these items', x + 340, slot2Y + 110);
+            }
+        }
+
+        // Instructions
+        ctx.fillStyle = '#888888';
+        ctx.font = '11px monospace';
+        ctx.fillText('Click items to select. Combine Trouble + Seed to create specialized seeds.', x + 20, y + h - 20);
+    }
+
+    renderInventory(ctx, x, y, w, h) {
+        const inv = this.game.inventory;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 18px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('INVENTORY', x + 20, y + 35);
+
+        ctx.font = '12px monospace';
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText(`Gold: ${inv.gold}g`, x + 200, y + 35);
+
+        // === LEFT COLUMN: Troubles ===
+        ctx.font = 'bold 14px monospace';
+        ctx.fillStyle = '#ff6666';
+        ctx.fillText('TROUBLES:', x + 20, y + 70);
+
+        const troubles = inv.getTroubles();
+        let troubleY = y + 95;
+
+        if (troubles.length === 0) {
+            ctx.fillStyle = '#666666';
+            ctx.font = '11px monospace';
+            ctx.fillText('No troubles collected.', x + 30, troubleY);
+            ctx.fillText('Talk to NPCs to learn about', x + 30, troubleY + 18);
+            ctx.fillText('problems you can solve.', x + 30, troubleY + 36);
+        } else {
+            troubles.forEach((trouble, i) => {
+                ctx.fillStyle = '#4a2020';
+                ctx.fillRect(x + 20, troubleY, 250, 60);
+
+                ctx.fillStyle = '#ff6666';
+                ctx.font = 'bold 12px monospace';
+                ctx.fillText(trouble.name, x + 30, troubleY + 18);
+
+                ctx.fillStyle = '#aaaaaa';
+                ctx.font = '10px monospace';
+                ctx.fillText(`Severity: ${trouble.severity || 1}`, x + 30, troubleY + 35);
+                if (trouble.grantsFeature) {
+                    ctx.fillText(`Grants: ${trouble.grantsFeature}`, x + 30, troubleY + 50);
+                }
+
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'right';
+                ctx.fillText(`x${trouble.count || 1}`, x + 260, troubleY + 18);
+                ctx.textAlign = 'left';
+
+                troubleY += 65;
+            });
+        }
+
+        // === RIGHT COLUMN: Real Items (Seeds, etc) ===
+        ctx.font = 'bold 14px monospace';
+        ctx.fillStyle = '#66ff66';
+        ctx.fillText('ITEMS:', x + 300, y + 70);
+
+        const realItems = inv.getRealItems();
+        let itemY = y + 95;
+
+        if (realItems.length === 0) {
+            ctx.fillStyle = '#666666';
+            ctx.font = '11px monospace';
+            ctx.fillText('No items collected.', x + 310, itemY);
+            ctx.fillText('Interact with fields to find', x + 310, itemY + 18);
+            ctx.fillText('Old Growth seeds.', x + 310, itemY + 36);
+        } else {
+            realItems.forEach((item, i) => {
+                ctx.fillStyle = '#2a4a2a';
+                ctx.fillRect(x + 300, itemY, 250, 60);
+
+                ctx.fillStyle = '#66ff66';
+                ctx.font = 'bold 12px monospace';
+                ctx.fillText(item.name, x + 310, itemY + 18);
+
+                ctx.fillStyle = '#aaaaaa';
+                ctx.font = '10px monospace';
+                if (item.stats) {
+                    ctx.fillText(`Hrd: ${item.stats.hardiness} | Yld: ${item.stats.yield}`, x + 310, itemY + 35);
+                }
+                if (item.feature) {
+                    ctx.fillText(`Feature: ${item.feature}`, x + 310, itemY + 50);
+                }
+
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'right';
+                ctx.fillText(`x${item.count || 1}`, x + 540, itemY + 18);
+                ctx.textAlign = 'left';
+
+                itemY += 65;
+            });
+        }
+
+        // === BOTTOM: Supplies ===
+        ctx.font = 'bold 14px monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('SUPPLIES:', x + 20, y + h - 80);
+
+        ctx.font = '11px monospace';
+        ctx.fillStyle = '#aaaaaa';
+        ctx.fillText(`Essence Vials: ${inv.getItemCount('essence_vials')}`, x + 20, y + h - 60);
+        ctx.fillText(`Synthesis Catalysts: ${inv.getItemCount('synthesis_catalysts')}`, x + 20, y + h - 45);
+        ctx.fillText(`Harvest: ${inv.getItemCount('harvest')} bushels`, x + 250, y + h - 60);
+
+        // Instructions
+        ctx.fillStyle = '#888888';
+        ctx.font = '11px monospace';
+        ctx.fillText('Press [I] to open/close inventory. Use cauldron to combine Troubles + Seeds.', x + 20, y + h - 15);
     }
 
     renderDialogue(ctx) {

@@ -532,7 +532,7 @@ export default function GamePage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 p-4">
-      <h1 className="text-2xl font-bold text-green-500 mb-4 tracking-wider">SEED BREEDER</h1>
+      <h1 className="text-2xl font-bold text-green-500 mb-4 tracking-wider">Magicraft</h1>
       <canvas
         ref={canvasRef}
         width={CANVAS_WIDTH}

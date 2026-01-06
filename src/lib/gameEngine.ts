@@ -225,7 +225,7 @@ export function createDefaultMap(): GameMap {
       isMoving: false,
       animFrame: 0,
       name: 'Elder Sage',
-      dialogue: ['Welcome, traveler!', 'The land needs your help.', 'You know the art of magic. Go make something of it.'],
+      dialogue: ['Greetings, friend!', 'The land needs your help.', 'You know the art of magic. Go make something of it.'],
     },
     {
       x: 8,
@@ -264,7 +264,8 @@ export function createDefaultMap(): GameMap {
       dialogue: [
         'Third year. Third failure.',
         "OldGrowth's seeds just... die here. I'm done.",
-        "Unless... you really think your 'essence magic'\ncan make something that survives this clay and drought?",
+        "Unless... you really think your 'essence magic' can make something that survives",
+        "this clay and drought?",
         'That row there. Give me one row. One season.',
         "Don't expect payment if it fails like everything else.",
       ],

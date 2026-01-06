@@ -19,7 +19,7 @@ export class Input {
             this.keys[e.code] = true;
 
             // Prevent default for game keys
-            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE'].includes(e.code)) {
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyI'].includes(e.code)) {
                 e.preventDefault();
             }
         });

@@ -2,6 +2,7 @@
 
 import { generateId, randomInt, randomFloat } from './utils.js';
 import { STAT_MAX } from './constants.js';
+import { combiningSystem } from './CombiningSystem.js';
 
 export class Inventory {
     constructor() {
@@ -14,6 +15,10 @@ export class Inventory {
             stabilization_gel: 1,
             harvest: 0
         };
+
+        // New inventory categories
+        this.troubles = [];      // Problems/issues like "Dry spell"
+        this.realItems = [];     // General items like seeds for cauldron use
 
         this.initializeStartingSeeds();
     }
@@ -290,12 +295,180 @@ export class Inventory {
         return `${prefix}${suffix}-${num}`;
     }
 
+    // ===== TROUBLE MANAGEMENT =====
+
+    getTroubles() {
+        return this.troubles;
+    }
+
+    getTroubleById(id) {
+        return this.troubles.find(t => t.id === id);
+    }
+
+    addTrouble(trouble) {
+        // Check if we already have this trouble by name
+        const existing = this.troubles.find(t => t.name === trouble.name);
+        if (existing) {
+            existing.count = (existing.count || 1) + 1;
+            return existing;
+        }
+
+        const newTrouble = {
+            id: generateId(),
+            type: 'trouble',
+            name: trouble.name,
+            description: trouble.description || '',
+            severity: trouble.severity || 1,
+            effects: trouble.effects || [],
+            statModifiers: trouble.statModifiers || {},
+            grantsFeature: trouble.grantsFeature || null,
+            featureModifier: trouble.featureModifier || null,
+            color: trouble.color || '#8b0000',
+            count: 1
+        };
+
+        this.troubles.push(newTrouble);
+        return newTrouble;
+    }
+
+    removeTrouble(troubleId, count = 1) {
+        const trouble = this.getTroubleById(troubleId);
+        if (!trouble) return false;
+
+        trouble.count = (trouble.count || 1) - count;
+        if (trouble.count <= 0) {
+            this.troubles = this.troubles.filter(t => t.id !== troubleId);
+        }
+        return true;
+    }
+
+    // ===== REAL ITEMS MANAGEMENT =====
+
+    getRealItems() {
+        return this.realItems;
+    }
+
+    getRealItemById(id) {
+        return this.realItems.find(i => i.id === id);
+    }
+
+    addRealItem(item) {
+        // Check if we already have this item by name
+        const existing = this.realItems.find(i => i.name === item.name);
+        if (existing) {
+            existing.count = (existing.count || 1) + 1;
+            return existing;
+        }
+
+        const newItem = {
+            id: generateId(),
+            type: item.type || 'seed',
+            name: item.name,
+            description: item.description || '',
+            stats: item.stats || { yield: 2, hardiness: 2, speed: 2, efficiency: 2 },
+            feature: item.feature || null,
+            color: item.color || '#4a7c59',
+            count: 1,
+            isStable: item.isStable !== undefined ? item.isStable : true
+        };
+
+        this.realItems.push(newItem);
+        return newItem;
+    }
+
+    removeRealItem(itemId, count = 1) {
+        const item = this.getRealItemById(itemId);
+        if (!item) return false;
+
+        item.count = (item.count || 1) - count;
+        if (item.count <= 0) {
+            this.realItems = this.realItems.filter(i => i.id !== itemId);
+        }
+        return true;
+    }
+
+    // ===== CAULDRON COMBINING =====
+
+    // Get all items available for cauldron combining
+    getCauldronItems() {
+        const items = [];
+
+        // Add troubles
+        for (const trouble of this.troubles) {
+            if (trouble.count > 0) {
+                items.push(trouble);
+            }
+        }
+
+        // Add real items (seeds, etc)
+        for (const item of this.realItems) {
+            if (item.count > 0) {
+                items.push(item);
+            }
+        }
+
+        return items;
+    }
+
+    // Combine two items using the cauldron
+    combineInCauldron(item1Id, item2Id) {
+        // Find items from both troubles and realItems
+        const item1 = this.getTroubleById(item1Id) || this.getRealItemById(item1Id);
+        const item2 = this.getTroubleById(item2Id) || this.getRealItemById(item2Id);
+
+        if (!item1 || !item2) return null;
+
+        // Check if combination is possible
+        if (!combiningSystem.canCombine(item1, item2)) {
+            return null;
+        }
+
+        // Perform the combination
+        const result = combiningSystem.combine(item1, item2);
+
+        if (result) {
+            // Remove the used items
+            if (item1.type === 'trouble') {
+                this.removeTrouble(item1.id);
+            } else {
+                this.removeRealItem(item1.id);
+            }
+
+            if (item2.type === 'trouble') {
+                this.removeTrouble(item2.id);
+            } else {
+                this.removeRealItem(item2.id);
+            }
+
+            // Add the result to appropriate inventory
+            if (result.type === 'trouble') {
+                return this.addTrouble(result);
+            } else {
+                return this.addRealItem(result);
+            }
+        }
+
+        return null;
+    }
+
+    // Predict the result of combining
+    predictCauldronCombination(item1Id, item2Id) {
+        const item1 = this.getTroubleById(item1Id) || this.getRealItemById(item1Id);
+        const item2 = this.getTroubleById(item2Id) || this.getRealItemById(item2Id);
+
+        if (!item1 || !item2) return null;
+
+        return combiningSystem.predictCombination(item1, item2);
+    }
+
     serialize() {
         return {
             gold: this.gold,
             seeds: this.seeds,
             essences: this.essences,
-            items: this.items
+            items: this.items,
+            troubles: this.troubles,
+            realItems: this.realItems
         };
     }
 
@@ -304,5 +477,7 @@ export class Inventory {
         this.seeds = data.seeds;
         this.essences = data.essences;
         this.items = data.items;
+        this.troubles = data.troubles || [];
+        this.realItems = data.realItems || [];
     }
 }

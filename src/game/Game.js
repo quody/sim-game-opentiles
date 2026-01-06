@@ -59,10 +59,10 @@ export class Game {
         // Show intro dialogue after a short delay
         setTimeout(() => {
             this.timeSystem.pause();
-            this.ui.showNotification('Welcome to Seed Breeder! Use WASD to move.');
+            this.ui.showNotification('Welcome to Seed Breeder! WASD: move, E: interact, I: inventory');
 
             setTimeout(() => {
-                this.ui.showNotification('Visit your LAB to the southwest to begin.');
+                this.ui.showNotification('Visit your LAB (southwest) - it has a CAULDRON for magic!');
             }, 3000);
         }, 500);
     }

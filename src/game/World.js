@@ -145,6 +145,15 @@ export class World {
         // Storage (right side)
         tiles[3][12] = TILES.STORAGE;
 
+        // Tables (scattered for workspace feel)
+        tiles[5][2] = TILES.TABLE;
+        tiles[5][5] = TILES.TABLE;
+        tiles[7][10] = TILES.TABLE;
+        tiles[7][13] = TILES.TABLE;
+
+        // CAULDRON - The Magic Bench (center-left area)
+        tiles[6][7] = TILES.CAULDRON;
+
         return {
             width,
             height,
@@ -299,7 +308,9 @@ export class World {
                tile === TILES.WATER ||
                tile === TILES.BENCH ||
                tile === TILES.CHAMBER ||
-               tile === TILES.STORAGE;
+               tile === TILES.STORAGE ||
+               tile === TILES.CAULDRON ||
+               tile === TILES.TABLE;
     }
 
     interactWithTile(x, y, game) {
@@ -321,11 +332,17 @@ export class World {
             case TILES.NOTICE_BOARD:
                 game.ui.showNoticeBoard();
                 break;
+            case TILES.CAULDRON:
+                game.ui.showCauldron();
+                break;
             case TILES.FIELD_EMPTY:
-                game.ui.showPlantingMenu(x, y);
+                this.interactWithField(x, y, game);
                 break;
             case TILES.FIELD_MATURE:
                 this.harvestField(x, y, game);
+                break;
+            case TILES.FIELD_DEAD:
+                this.interactWithDeadField(x, y, game);
                 break;
         }
     }
@@ -365,7 +382,44 @@ export class World {
                     condition: (g) => !g.questSystem.isQuestStarted('prove_seeds'),
                     text: "Third year. Third failure. OldGrowth's seeds just... die here. I'm done.\n\nUnless... you really think your 'essence magic' can make something that survives this clay and drought?",
                     options: [
-                        { text: "Give me one row. One season.", action: () => game.questSystem.startQuest('prove_seeds') }
+                        {
+                            text: "Give me one row. One season.",
+                            action: () => {
+                                game.questSystem.startQuest('prove_seeds');
+                                // Give player the "Dry spell" trouble
+                                game.inventory.addTrouble({
+                                    name: 'Dry spell',
+                                    description: 'The drought plaguing these eastern hills. Seeds must be hardy to survive.',
+                                    severity: 2,
+                                    effects: ['drought_resistance_needed'],
+                                    statModifiers: { hardiness: 2 },
+                                    grantsFeature: 'Drought Resistant',
+                                    color: '#d4a574'
+                                });
+                                game.ui.showNotification('Received Trouble: Dry spell');
+                            }
+                        }
+                    ]
+                },
+                {
+                    condition: (g) => g.questSystem.isQuestActive('prove_seeds') && !g.inventory.getTroubles().some(t => t.name === 'Dry spell'),
+                    text: "You need to understand the problem before you can solve it. Talk to me again about the drought.",
+                    options: [
+                        {
+                            text: "Tell me about the dry spell.",
+                            action: () => {
+                                game.inventory.addTrouble({
+                                    name: 'Dry spell',
+                                    description: 'The drought plaguing these eastern hills. Seeds must be hardy to survive.',
+                                    severity: 2,
+                                    effects: ['drought_resistance_needed'],
+                                    statModifiers: { hardiness: 2 },
+                                    grantsFeature: 'Drought Resistant',
+                                    color: '#d4a574'
+                                });
+                                game.ui.showNotification('Received Trouble: Dry spell');
+                            }
+                        }
                     ]
                 },
                 {
@@ -396,6 +450,55 @@ export class World {
             this.fields = this.fields.filter(f => f !== field);
 
             game.ui.showNotification(`Harvested ${yield_} bushels and ${Math.floor(yield_ / 2)} seeds!`);
+        }
+    }
+
+    interactWithField(x, y, game) {
+        // Check if this field has already given an Old Growth seed
+        const fieldKey = `field_${x}_${y}`;
+        if (!this.fieldInteractions) {
+            this.fieldInteractions = {};
+        }
+
+        if (!this.fieldInteractions[fieldKey]) {
+            // First interaction - give Old Growth seed
+            const oldGrowthSeed = game.inventory.addRealItem({
+                type: 'seed',
+                name: 'Old Growth seed',
+                description: 'A seed from the old fields. Holds ancient potential.',
+                stats: { yield: 2, hardiness: 2, speed: 2, efficiency: 3 },
+                feature: null,
+                color: '#6b5b4f'
+            });
+            this.fieldInteractions[fieldKey] = true;
+            game.ui.showNotification('Found an Old Growth seed!');
+        }
+
+        // Show planting menu
+        game.ui.showPlantingMenu(x, y);
+    }
+
+    interactWithDeadField(x, y, game) {
+        // Dead fields can also yield Old Growth seeds on first interaction
+        const fieldKey = `dead_field_${x}_${y}`;
+        if (!this.fieldInteractions) {
+            this.fieldInteractions = {};
+        }
+
+        if (!this.fieldInteractions[fieldKey]) {
+            // First interaction - give Old Growth seed from dead field
+            const oldGrowthSeed = game.inventory.addRealItem({
+                type: 'seed',
+                name: 'Old Growth seed',
+                description: 'A withered seed from the failed crops. Still holds some life.',
+                stats: { yield: 1, hardiness: 3, speed: 1, efficiency: 2 },
+                feature: 'Survivor',
+                color: '#8b7355'
+            });
+            this.fieldInteractions[fieldKey] = true;
+            game.ui.showNotification('Found an Old Growth seed among the dead crops!');
+        } else {
+            game.ui.showNotification('Nothing but dead crops here...');
         }
     }
 
@@ -468,6 +571,8 @@ export class World {
             case TILES.CHAMBER: return '#4169e1';
             case TILES.STORAGE: return '#8b7355';
             case TILES.NOTICE_BOARD: return '#654321';
+            case TILES.CAULDRON: return '#4a2080';
+            case TILES.TABLE: return '#8b6914';
             default: return COLORS.GRASS;
         }
     }
@@ -505,6 +610,14 @@ export class World {
                 break;
             case TILES.FIELD_MATURE:
                 ctx.fillText('*', x + TILE_SIZE / 2, y + TILE_SIZE / 2 + 4);
+                break;
+            case TILES.CAULDRON:
+                ctx.fillStyle = '#9966ff';
+                ctx.fillText('CLDN', x + TILE_SIZE / 2, y + TILE_SIZE / 2 + 4);
+                break;
+            case TILES.TABLE:
+                ctx.fillStyle = '#daa520';
+                ctx.fillText('TBL', x + TILE_SIZE / 2, y + TILE_SIZE / 2 + 4);
                 break;
         }
     }
