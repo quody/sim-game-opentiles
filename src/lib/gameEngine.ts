@@ -87,6 +87,19 @@ export const TILES = {
   WATER: 13,
   BRIDGE: 14,
   CAULDRON: 15,
+  // Agriculture tiles
+  FIELD_PLANTED: 16,
+  FIELD_GROWING: 17,
+  FIELD_MATURE: 18,
+  FARMHOUSE: 20,
+  BARN: 21,
+  SILO: 22,
+  STORAGE_SHED: 23,
+  MILL: 24,
+  WELL: 25,
+  FENCE: 26,
+  IRRIGATION: 27,
+  ORCHARD_TREE: 28,
 } as const;
 
 // Map tile type to sprite name
@@ -103,6 +116,19 @@ export const TILE_SPRITES: Record<number, string> = {
   [TILES.WATER]: 'lit fort wall center',
   [TILES.BRIDGE]: 'bridge n s',
   [TILES.CAULDRON]: 'can of grease',
+  // Agriculture sprites
+  [TILES.FIELD_PLANTED]: 'dusk plowed field c',
+  [TILES.FIELD_GROWING]: 'young leafy vegetable',
+  [TILES.FIELD_MATURE]: 'ripe leafy vegetable',
+  [TILES.FARMHOUSE]: 'lit orange wall center',
+  [TILES.BARN]: 'lit fort wall center',
+  [TILES.SILO]: 'closed barrel',
+  [TILES.STORAGE_SHED]: 'closed big chest',
+  [TILES.MILL]: 'wooden table',
+  [TILES.WELL]: 'stone table',
+  [TILES.FENCE]: 'stone fence up down',
+  [TILES.IRRIGATION]: 'bridge e w',
+  [TILES.ORCHARD_TREE]: 'cactus nw ne sw se',
 };
 
 // Base tile to use under overlay tiles
@@ -113,6 +139,16 @@ export const OVERLAY_BASE: Record<number, number> = {
   [TILES.WATER]: TILES.GRASS,  // Water on grass
   [TILES.BRIDGE]: TILES.DIRT,  // Bridge on dirt
   [TILES.CAULDRON]: TILES.FLOOR, // Cauldron on floor
+  // Agriculture overlays
+  [TILES.FARMHOUSE]: TILES.GRASS,
+  [TILES.BARN]: TILES.GRASS,
+  [TILES.SILO]: TILES.GRASS,
+  [TILES.STORAGE_SHED]: TILES.GRASS,
+  [TILES.MILL]: TILES.GRASS,
+  [TILES.WELL]: TILES.GRASS,
+  [TILES.FENCE]: TILES.GRASS,
+  [TILES.IRRIGATION]: TILES.DIRT,
+  [TILES.ORCHARD_TREE]: TILES.GRASS,
 };
 
 // Check if a tile is an overlay (needs base tile drawn first)

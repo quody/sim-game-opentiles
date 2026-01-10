@@ -10,6 +10,10 @@
     "qq": "git add -A && git commit -m 'WIP' && git push"
   },
   "dependencies": {
+    "@types/dagre": "^0.7.53",
+    "@xyflow/react": "^12.10.0",
+    "dagre": "^0.8.5",
+    "elkjs": "^0.11.0",
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"

@@ -235,3 +235,49 @@ dusk dirt floor c
 bounds:800,1460,64,64
 dusk plowed field c
 bounds:2240,252,64,64
+farmer man
+index:0
+bounds:5408,3132,64,64
+farmer man
+index:1
+bounds:1016,668,64,64
+farmer woman
+index:0
+bounds:5624,2556,64,64
+farmer woman
+index:1
+bounds:2888,2988,64,64
+young leafy vegetable
+bounds:5696,1836,64,64
+young root vegetable
+bounds:7352,2556,64,64
+young vine vegetable
+bounds:1520,2412,64,64
+ripe leafy vegetable
+bounds:4832,2844,64,64
+ripe root vegetable
+bounds:1088,612,64,64
+ripe vine vegetable
+bounds:1016,2180,64,64
+stone fence down left
+bounds:5264,2700,64,64
+stone fence down left right
+bounds:1400,3780,64,64
+stone fence down right
+bounds:2312,2124,64,64
+stone fence left right
+bounds:2744,612,64,64
+stone fence up down
+bounds:1808,1548,64,64
+stone fence up down left
+bounds:5480,2124,64,64
+stone fence up down left right
+bounds:6560,2052,64,64
+stone fence up down right
+bounds:4760,36,64,64
+stone fence up left
+bounds:7280,3060,64,64
+stone fence up left right
+bounds:2888,252,64,64
+stone fence up right
+bounds:7280,2412,64,64

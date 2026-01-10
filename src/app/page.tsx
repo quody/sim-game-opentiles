@@ -24,6 +24,12 @@ export default function Home() {
           >
             World Generator
           </Link>
+          <Link
+            href="/tech-tree"
+            className="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-medium transition-colors"
+          >
+            Tech Tree
+          </Link>
         </div>
       </main>
     </div>

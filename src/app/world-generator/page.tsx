@@ -6,6 +6,7 @@ import {
   TILES,
   type SpriteAtlas,
   type GameMap,
+  type NPC,
 } from '@/lib/gameEngine';
 import {
   createCamera,
@@ -21,6 +22,11 @@ import {
   updatePlayerMovement,
   type Player,
 } from '@/lib/playerEngine';
+import { analyzeTerrainForFarms } from '@/lib/agriculture/biomeAnalyzer';
+import { selectVillageAndHomesteadSites } from '@/lib/agriculture/villageGenerator';
+import { generateFarm, applyFarmToMap } from '@/lib/agriculture/farmGenerator';
+import { generateFarmersForFarm } from '@/lib/agriculture/farmerGenerator';
+import type { Farmer } from '@/lib/agriculture/types';
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
@@ -118,11 +124,53 @@ function generateRandomMap(width: number, height: number, seed?: number): GameMa
     }
   }
 
+  // ===== AGRICULTURE GENERATION =====
+
+  // Analyze terrain for farm placement
+  const farmZones = analyzeTerrainForFarms(tiles, width, height, random);
+
+  // Select village and homestead sites
+  const { villages, homesteads } = selectVillageAndHomesteadSites(farmZones, random);
+
+  // Generate farms and farmers
+  const allFarmers: Farmer[] = [];
+
+  // Generate village farms
+  for (const village of villages) {
+    const farm = generateFarm(village, random);
+    applyFarmToMap(farm, tiles, width, height);
+    const farmers = generateFarmersForFarm(farm, random);
+    allFarmers.push(...farmers);
+  }
+
+  // Generate homestead farms
+  for (const homestead of homesteads) {
+    const farm = generateFarm(homestead, random);
+    applyFarmToMap(farm, tiles, width, height);
+    const farmers = generateFarmersForFarm(farm, random);
+    allFarmers.push(...farmers);
+  }
+
+  // Convert Farmer[] to NPC[] for GameMap
+  const npcs: NPC[] = allFarmers.map(farmer => ({
+    x: farmer.x,
+    y: farmer.y,
+    width: farmer.width,
+    height: farmer.height,
+    sprite: farmer.sprite,
+    direction: farmer.direction,
+    isMoving: farmer.isMoving,
+    animFrame: farmer.animFrame,
+    name: farmer.name,
+    dialogue: farmer.dialogue,
+    trouble: farmer.trouble,
+  }));
+
   return {
     width,
     height,
     tiles,
-    npcs: [],
+    npcs,
     spawn: { x: Math.floor(width / 2), y: Math.floor(height / 2) },
   };
 }
@@ -134,6 +182,12 @@ interface WorldGenState {
   camera: Camera;
   map: GameMap;
   seed: number;
+  currentDialogue: {
+    npcName: string;
+    text: string;
+    index: number;
+    totalLines: number;
+  } | null;
 }
 
 export default function WorldGeneratorPage() {
@@ -163,6 +217,7 @@ export default function WorldGeneratorPage() {
           camera: createCamera(player.x, player.y),
           map,
           seed,
+          currentDialogue: null,
         };
 
         setLoading(false);
@@ -186,16 +241,58 @@ export default function WorldGeneratorPage() {
       camera: createCamera(player.x, player.y),
       map,
       seed,
+      currentDialogue: null,
     };
   };
 
   // Input handling
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      keysRef.current.add(e.key.toLowerCase());
+      const state = stateRef.current;
+      if (!state) return;
+
+      const key = e.key.toLowerCase();
+      keysRef.current.add(key);
+
+      // Handle dialogue
+      if (key === 'e') {
+        if (state.currentDialogue) {
+          // Advance or close dialogue
+          const npc = state.map.npcs.find(n => n.name === state.currentDialogue!.npcName);
+          if (!npc) {
+            state.currentDialogue = null;
+            return;
+          }
+
+          const nextIndex = state.currentDialogue.index + 1;
+          if (nextIndex >= npc.dialogue.length) {
+            // Close dialogue
+            state.currentDialogue = null;
+          } else {
+            // Show next line
+            state.currentDialogue = {
+              npcName: npc.name,
+              text: npc.dialogue[nextIndex],
+              index: nextIndex,
+              totalLines: npc.dialogue.length,
+            };
+          }
+        } else {
+          // Try to interact with nearby NPC
+          const nearbyNPC = findNearbyNPC(state);
+          if (nearbyNPC) {
+            state.currentDialogue = {
+              npcName: nearbyNPC.name,
+              text: nearbyNPC.dialogue[0],
+              index: 0,
+              totalLines: nearbyNPC.dialogue.length,
+            };
+          }
+        }
+      }
 
       // Regenerate with R
-      if (e.key.toLowerCase() === 'r') {
+      if (key === 'r') {
         regenerateMap();
       }
     }
@@ -211,6 +308,23 @@ export default function WorldGeneratorPage() {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
+
+  // Find nearby NPC for interaction
+  function findNearbyNPC(state: WorldGenState): NPC | null {
+    const { player, map } = state;
+    const interactionDistance = 1.5;
+
+    for (const npc of map.npcs) {
+      const dx = Math.abs(npc.x - player.x);
+      const dy = Math.abs(npc.y - player.y);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance <= interactionDistance) {
+        return npc;
+      }
+    }
+    return null;
+  }
 
   // Game loop
   useEffect(() => {
@@ -260,24 +374,99 @@ export default function WorldGeneratorPage() {
       // Render tiles
       renderTiles(ctx, atlas, state.map, offsetX, offsetY, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-      // Render player
+      // Render NPCs (farmers)
       const animFrame = Math.floor(animTimeRef.current / 300) % 2;
+      for (const npc of state.map.npcs) {
+        renderEntity(ctx, atlas, npc, offsetX, offsetY, undefined, animFrame);
+      }
+
+      // Render player
       renderEntity(ctx, atlas, state.player, offsetX, offsetY, undefined, animFrame);
+
+      // Check if near NPC for interaction prompt
+      const nearbyNPC = findNearbyNPC(state);
 
       // UI overlay
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(10, 10, 250, 60);
+      ctx.fillRect(10, 10, 250, 80);
       ctx.strokeStyle = '#8844aa';
       ctx.lineWidth = 2;
-      ctx.strokeRect(10, 10, 250, 60);
+      ctx.strokeRect(10, 10, 250, 80);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = '14px monospace';
       ctx.textAlign = 'left';
       ctx.fillText(`Seed: ${state.seed}`, 20, 32);
+      ctx.fillText(`Farmers: ${state.map.npcs.length}`, 20, 52);
       ctx.fillStyle = '#888888';
       ctx.font = '12px monospace';
-      ctx.fillText('WASD: Move | R: Regenerate', 20, 52);
+      ctx.fillText('WASD: Move | R: Regenerate', 20, 72);
+
+      // Interaction prompt
+      if (nearbyNPC && !state.currentDialogue) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(CANVAS_WIDTH / 2 - 100, CANVAS_HEIGHT - 80, 200, 30);
+        ctx.strokeStyle = '#8844aa';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(CANVAS_WIDTH / 2 - 100, CANVAS_HEIGHT - 80, 200, 30);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '14px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`E: Talk to ${nearbyNPC.name}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT - 58);
+      }
+
+      // Dialogue box
+      if (state.currentDialogue) {
+        const dialogueWidth = CANVAS_WIDTH - 100;
+        const dialogueHeight = 120;
+        const dialogueX = 50;
+        const dialogueY = CANVAS_HEIGHT - dialogueHeight - 20;
+
+        // Background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillRect(dialogueX, dialogueY, dialogueWidth, dialogueHeight);
+        ctx.strokeStyle = '#8844aa';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(dialogueX, dialogueY, dialogueWidth, dialogueHeight);
+
+        // NPC name
+        ctx.fillStyle = '#ffaa00';
+        ctx.font = 'bold 16px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(state.currentDialogue.npcName, dialogueX + 20, dialogueY + 25);
+
+        // Dialogue text (word wrap)
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '14px monospace';
+        const words = state.currentDialogue.text.split(' ');
+        let line = '';
+        let y = dialogueY + 50;
+        const maxWidth = dialogueWidth - 40;
+
+        for (const word of words) {
+          const testLine = line + word + ' ';
+          const metrics = ctx.measureText(testLine);
+          if (metrics.width > maxWidth && line !== '') {
+            ctx.fillText(line, dialogueX + 20, y);
+            line = word + ' ';
+            y += 20;
+          } else {
+            line = testLine;
+          }
+        }
+        ctx.fillText(line, dialogueX + 20, y);
+
+        // Progress indicator
+        ctx.fillStyle = '#888888';
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(
+          `${state.currentDialogue.index + 1}/${state.currentDialogue.totalLines} | E: Continue`,
+          dialogueX + dialogueWidth - 20,
+          dialogueY + dialogueHeight - 15
+        );
+      }
     }
 
     animationId = requestAnimationFrame(gameLoop);
@@ -326,6 +515,7 @@ export default function WorldGeneratorPage() {
       </div>
       <div className="mt-2 text-zinc-500 text-sm">
         <kbd className="px-2 py-1 bg-zinc-800 rounded text-zinc-300">WASD</kbd> Move |{' '}
+        <kbd className="px-2 py-1 bg-zinc-800 rounded text-zinc-300">E</kbd> Interact |{' '}
         <kbd className="px-2 py-1 bg-zinc-800 rounded text-zinc-300">R</kbd> New World
       </div>
     </div>
