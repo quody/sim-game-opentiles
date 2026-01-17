@@ -195,3 +195,104 @@ export function getNPCAtPosition(npcs: NPC[], x: number, y: number): NPC | null 
   }
   return null;
 }
+
+// ===== INFINITE WORLD MOVEMENT =====
+
+import type { ChunkManager } from './world/chunkManager';
+
+export function canMoveToWorld(
+  chunkManager: ChunkManager,
+  x: number,
+  y: number
+): boolean {
+  return chunkManager.canMoveTo(x, y);
+}
+
+export function updatePlayerMovementWorld(
+  player: Player,
+  chunkManager: ChunkManager,
+  keys: Set<string>,
+  deltaTime: number
+): void {
+  // Check if currently moving (not at destination)
+  const isCurrentlyMoving = player.moveProgress < 1;
+
+  if (isCurrentlyMoving) {
+    // Continue moving towards target
+    const moveAmount = player.speed * (deltaTime / 1000);
+    player.moveProgress = Math.min(1, player.moveProgress + moveAmount);
+
+    // Interpolate position
+    player.x = player.gridX + (player.targetX - player.gridX) * player.moveProgress;
+    player.y = player.gridY + (player.targetY - player.gridY) * player.moveProgress;
+
+    // Check if reached destination
+    if (player.moveProgress >= 1) {
+      player.gridX = player.targetX;
+      player.gridY = player.targetY;
+      player.x = player.gridX;
+      player.y = player.gridY;
+      player.isMoving = false;
+    }
+  }
+
+  // Check for new movement input
+  const canAcceptInput = !isCurrentlyMoving || player.moveProgress >= 0.85;
+
+  if (canAcceptInput) {
+    let dx = 0;
+    let dy = 0;
+
+    if (keys.has('w') || keys.has('arrowup')) dy = -1;
+    else if (keys.has('s') || keys.has('arrowdown')) dy = 1;
+    else if (keys.has('a') || keys.has('arrowleft')) dx = -1;
+    else if (keys.has('d') || keys.has('arrowright')) dx = 1;
+
+    if (dx !== 0 || dy !== 0) {
+      // Update direction
+      player.direction = getDirectionFromDelta(dx, dy);
+
+      // Calculate new position from current target
+      const baseX = player.targetX;
+      const baseY = player.targetY;
+      const newX = baseX + dx;
+      const newY = baseY + dy;
+
+      // Only queue a new movement if it's different from current target
+      const isDifferentTarget = newX !== player.targetX || newY !== player.targetY;
+
+      // If not moving, use gridX/gridY as base instead
+      if (!isCurrentlyMoving && (dx !== 0 || dy !== 0)) {
+        const newX = player.gridX + dx;
+        const newY = player.gridY + dy;
+
+        if (canMoveToWorld(chunkManager, newX, newY)) {
+          player.targetX = newX;
+          player.targetY = newY;
+          player.moveProgress = 0;
+          player.isMoving = true;
+        }
+      } else if (isCurrentlyMoving && isDifferentTarget && canMoveToWorld(chunkManager, newX, newY)) {
+        // Queue next movement
+        player.queuedMoveX = dx;
+        player.queuedMoveY = dy;
+      }
+    }
+  }
+
+  // Apply queued movement when current movement completes
+  if (!isCurrentlyMoving && player.queuedMoveX !== undefined && player.queuedMoveY !== undefined) {
+    const newX = player.gridX + player.queuedMoveX;
+    const newY = player.gridY + player.queuedMoveY;
+
+    if (canMoveToWorld(chunkManager, newX, newY)) {
+      player.targetX = newX;
+      player.targetY = newY;
+      player.moveProgress = 0;
+      player.isMoving = true;
+    }
+
+    player.queuedMoveX = undefined;
+    player.queuedMoveY = undefined;
+  }
+}

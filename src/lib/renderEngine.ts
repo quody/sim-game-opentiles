@@ -2,6 +2,8 @@
 
 import { drawSprite, TILE_SIZE, TILE_SPRITES, isOverlayTile, getBaseTile, TILES } from './gameEngine';
 import type { SpriteAtlas, GameMap, Entity, NPC } from './gameEngine';
+import type { Chunk } from './world/types';
+import { CHUNK_SIZE } from './world/types';
 
 // ===== CAMERA =====
 
@@ -154,6 +156,87 @@ export function renderNPC(
   ctx.font = '10px monospace';
   ctx.textAlign = 'center';
   ctx.fillText(npc.name, screenX + tileSize / 2, screenY - 4);
+}
+
+// ===== CHUNK RENDERING =====
+
+export function renderChunks(
+  ctx: CanvasRenderingContext2D,
+  atlas: SpriteAtlas,
+  chunks: Chunk[],
+  offsetX: number,
+  offsetY: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  tileSize: number = TILE_SIZE
+): void {
+  for (const chunk of chunks) {
+    const chunkWorldX = chunk.coord.chunkX * CHUNK_SIZE;
+    const chunkWorldY = chunk.coord.chunkY * CHUNK_SIZE;
+
+    for (let localY = 0; localY < CHUNK_SIZE; localY++) {
+      for (let localX = 0; localX < CHUNK_SIZE; localX++) {
+        const worldX = chunkWorldX + localX;
+        const worldY = chunkWorldY + localY;
+        const screenX = worldX * tileSize + offsetX;
+        const screenY = worldY * tileSize + offsetY;
+
+        // Cull off-screen tiles
+        if (screenX < -tileSize || screenX > canvasWidth ||
+            screenY < -tileSize || screenY > canvasHeight) {
+          continue;
+        }
+
+        const tile = chunk.tiles[localY][localX];
+
+        // Always draw base tile first
+        const baseTile = getBaseTile(tile);
+        const baseSpriteName = TILE_SPRITES[baseTile];
+        if (baseSpriteName && atlas.sprites.has(baseSpriteName)) {
+          drawSprite(ctx, atlas, baseSpriteName, screenX, screenY, 0);
+        } else {
+          ctx.fillStyle = getTileColor(baseTile);
+          ctx.fillRect(screenX, screenY, tileSize, tileSize);
+        }
+
+        // Draw overlay tile on top
+        if (isOverlayTile(tile)) {
+          const overlaySpriteName = TILE_SPRITES[tile];
+          if (overlaySpriteName && atlas.sprites.has(overlaySpriteName)) {
+            drawSprite(ctx, atlas, overlaySpriteName, screenX, screenY, 0);
+          }
+        }
+      }
+    }
+  }
+}
+
+export function renderChunkDebug(
+  ctx: CanvasRenderingContext2D,
+  chunks: Chunk[],
+  offsetX: number,
+  offsetY: number,
+  tileSize: number = TILE_SIZE
+): void {
+  ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+  ctx.lineWidth = 1;
+  ctx.font = '10px monospace';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+
+  for (const chunk of chunks) {
+    const chunkWorldX = chunk.coord.chunkX * CHUNK_SIZE;
+    const chunkWorldY = chunk.coord.chunkY * CHUNK_SIZE;
+    const screenX = chunkWorldX * tileSize + offsetX;
+    const screenY = chunkWorldY * tileSize + offsetY;
+    const size = CHUNK_SIZE * tileSize;
+
+    ctx.strokeRect(screenX, screenY, size, size);
+    ctx.fillText(
+      `${chunk.coord.chunkX},${chunk.coord.chunkY}`,
+      screenX + 4,
+      screenY + 12
+    );
+  }
 }
 
 // ===== CANVAS UTILITIES =====

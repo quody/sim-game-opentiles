@@ -3,185 +3,39 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   loadGameAtlas,
-  TILES,
+  TILE_SIZE,
   type SpriteAtlas,
-  type GameMap,
   type NPC,
 } from '@/lib/gameEngine';
 import {
   createCamera,
   updateCamera,
   getCameraOffset,
-  renderTiles,
+  renderChunks,
+  renderChunkDebug,
   renderEntity,
   clearCanvas,
   type Camera,
 } from '@/lib/renderEngine';
 import {
   createPlayer,
-  updatePlayerMovement,
+  updatePlayerMovementWorld,
+  getNPCAtPosition,
   type Player,
 } from '@/lib/playerEngine';
-import { analyzeTerrainForFarms } from '@/lib/agriculture/biomeAnalyzer';
-import { selectVillageAndHomesteadSites } from '@/lib/agriculture/villageGenerator';
-import { generateFarm, applyFarmToMap } from '@/lib/agriculture/farmGenerator';
-import { generateFarmersForFarm } from '@/lib/agriculture/farmerGenerator';
-import type { Farmer } from '@/lib/agriculture/types';
+import { ChunkManager } from '@/lib/world/chunkManager';
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
-
-// ===== MAP GENERATION =====
-
-function generateRandomMap(width: number, height: number, seed?: number): GameMap {
-  const tiles: number[][] = [];
-
-  // Simple seeded random
-  let rng = seed || Math.random() * 10000;
-  const random = () => {
-    rng = (rng * 1103515245 + 12345) % 2147483648;
-    return rng / 2147483648;
-  };
-
-  // Fill with grass
-  for (let y = 0; y < height; y++) {
-    tiles[y] = [];
-    for (let x = 0; x < width; x++) {
-      tiles[y][x] = TILES.GRASS;
-    }
-  }
-
-  // Create walls around the edges
-  for (let x = 0; x < width; x++) {
-    tiles[0][x] = TILES.WALL;
-    tiles[height - 1][x] = TILES.WALL;
-  }
-  for (let y = 0; y < height; y++) {
-    tiles[y][0] = TILES.WALL;
-    tiles[y][width - 1] = TILES.WALL;
-  }
-
-  // Scatter some dirt paths
-  for (let i = 0; i < width * 2; i++) {
-    const x = Math.floor(random() * (width - 4)) + 2;
-    const y = Math.floor(random() * (height - 4)) + 2;
-    const length = Math.floor(random() * 8) + 3;
-    const horizontal = random() > 0.5;
-
-    for (let j = 0; j < length; j++) {
-      const tx = horizontal ? x + j : x;
-      const ty = horizontal ? y : y + j;
-      if (tx > 0 && tx < width - 1 && ty > 0 && ty < height - 1) {
-        tiles[ty][tx] = TILES.DIRT;
-      }
-    }
-  }
-
-  // Add some random wall clusters (buildings/obstacles)
-  const numClusters = Math.floor(random() * 5) + 3;
-  for (let i = 0; i < numClusters; i++) {
-    const cx = Math.floor(random() * (width - 10)) + 5;
-    const cy = Math.floor(random() * (height - 10)) + 5;
-    const cw = Math.floor(random() * 4) + 3;
-    const ch = Math.floor(random() * 4) + 3;
-
-    for (let y = cy; y < cy + ch && y < height - 1; y++) {
-      for (let x = cx; x < cx + cw && x < width - 1; x++) {
-        if (y === cy || y === cy + ch - 1 || x === cx || x === cx + cw - 1) {
-          tiles[y][x] = TILES.WALL;
-        } else {
-          tiles[y][x] = TILES.FLOOR;
-        }
-      }
-    }
-    // Add a door
-    const doorSide = Math.floor(random() * 4);
-    if (doorSide === 0 && cy + ch < height - 1) tiles[cy + ch - 1][cx + Math.floor(cw / 2)] = TILES.DOOR;
-    else if (doorSide === 1 && cy > 1) tiles[cy][cx + Math.floor(cw / 2)] = TILES.DOOR;
-    else if (doorSide === 2 && cx + cw < width - 1) tiles[cy + Math.floor(ch / 2)][cx + cw - 1] = TILES.DOOR;
-    else if (cx > 1) tiles[cy + Math.floor(ch / 2)][cx] = TILES.DOOR;
-  }
-
-  // Add some water features
-  const numPonds = Math.floor(random() * 3) + 1;
-  for (let i = 0; i < numPonds; i++) {
-    const px = Math.floor(random() * (width - 8)) + 4;
-    const py = Math.floor(random() * (height - 8)) + 4;
-    const size = Math.floor(random() * 3) + 2;
-
-    for (let dy = -size; dy <= size; dy++) {
-      for (let dx = -size; dx <= size; dx++) {
-        if (dx * dx + dy * dy <= size * size) {
-          const tx = px + dx;
-          const ty = py + dy;
-          if (tx > 1 && tx < width - 2 && ty > 1 && ty < height - 2) {
-            if (tiles[ty][tx] === TILES.GRASS || tiles[ty][tx] === TILES.DIRT) {
-              tiles[ty][tx] = TILES.WATER;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // ===== AGRICULTURE GENERATION =====
-
-  // Analyze terrain for farm placement
-  const farmZones = analyzeTerrainForFarms(tiles, width, height, random);
-
-  // Select village and homestead sites
-  const { villages, homesteads } = selectVillageAndHomesteadSites(farmZones, random);
-
-  // Generate farms and farmers
-  const allFarmers: Farmer[] = [];
-
-  // Generate village farms
-  for (const village of villages) {
-    const farm = generateFarm(village, random);
-    applyFarmToMap(farm, tiles, width, height);
-    const farmers = generateFarmersForFarm(farm, random);
-    allFarmers.push(...farmers);
-  }
-
-  // Generate homestead farms
-  for (const homestead of homesteads) {
-    const farm = generateFarm(homestead, random);
-    applyFarmToMap(farm, tiles, width, height);
-    const farmers = generateFarmersForFarm(farm, random);
-    allFarmers.push(...farmers);
-  }
-
-  // Convert Farmer[] to NPC[] for GameMap
-  const npcs: NPC[] = allFarmers.map(farmer => ({
-    x: farmer.x,
-    y: farmer.y,
-    width: farmer.width,
-    height: farmer.height,
-    sprite: farmer.sprite,
-    direction: farmer.direction,
-    isMoving: farmer.isMoving,
-    animFrame: farmer.animFrame,
-    name: farmer.name,
-    dialogue: farmer.dialogue,
-    trouble: farmer.trouble,
-  }));
-
-  return {
-    width,
-    height,
-    tiles,
-    npcs,
-    spawn: { x: Math.floor(width / 2), y: Math.floor(height / 2) },
-  };
-}
 
 // ===== GAME STATE =====
 
 interface WorldGenState {
   player: Player;
   camera: Camera;
-  map: GameMap;
-  seed: number;
+  chunkManager: ChunkManager;
+  worldSeed: number;
+  showDebug: boolean;
   currentDialogue: {
     npcName: string;
     text: string;
@@ -199,6 +53,7 @@ export default function WorldGeneratorPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentSeed, setCurrentSeed] = useState(0);
+  const [stats, setStats] = useState({ chunks: 0, npcs: 0, regions: 0 });
 
   // Initialize
   useEffect(() => {
@@ -209,14 +64,23 @@ export default function WorldGeneratorPage() {
 
         const seed = Math.floor(Math.random() * 100000);
         setCurrentSeed(seed);
-        const map = generateRandomMap(50, 40, seed);
-        const player = createPlayer(map.spawn.x, map.spawn.y);
+
+        const chunkManager = new ChunkManager(seed, {
+          loadRadius: 3,
+          unloadRadius: 5,
+          maxLoadedChunks: 100,
+        });
+
+        // Find spawn point
+        const spawn = chunkManager.findSpawnPoint();
+        const player = createPlayer(spawn.x, spawn.y);
 
         stateRef.current = {
           player,
           camera: createCamera(player.x, player.y),
-          map,
-          seed,
+          chunkManager,
+          worldSeed: seed,
+          showDebug: false,
           currentDialogue: null,
         };
 
@@ -229,18 +93,28 @@ export default function WorldGeneratorPage() {
     init();
   }, []);
 
-  // Regenerate map
-  const regenerateMap = () => {
+  // Regenerate world
+  const regenerateWorld = () => {
     if (!stateRef.current) return;
+
     const seed = Math.floor(Math.random() * 100000);
     setCurrentSeed(seed);
-    const map = generateRandomMap(50, 40, seed);
-    const player = createPlayer(map.spawn.x, map.spawn.y);
+
+    const chunkManager = new ChunkManager(seed, {
+      loadRadius: 3,
+      unloadRadius: 5,
+      maxLoadedChunks: 100,
+    });
+
+    const spawn = chunkManager.findSpawnPoint();
+    const player = createPlayer(spawn.x, spawn.y);
+
     stateRef.current = {
       player,
       camera: createCamera(player.x, player.y),
-      map,
-      seed,
+      chunkManager,
+      worldSeed: seed,
+      showDebug: stateRef.current.showDebug,
       currentDialogue: null,
     };
   };
@@ -254,11 +128,18 @@ export default function WorldGeneratorPage() {
       const key = e.key.toLowerCase();
       keysRef.current.add(key);
 
+      // Toggle debug with F3
+      if (key === 'f3') {
+        state.showDebug = !state.showDebug;
+        e.preventDefault();
+      }
+
       // Handle dialogue
       if (key === 'e') {
         if (state.currentDialogue) {
           // Advance or close dialogue
-          const npc = state.map.npcs.find(n => n.name === state.currentDialogue!.npcName);
+          const npcs = state.chunkManager.getAllLoadedNPCs();
+          const npc = npcs.find(n => n.name === state.currentDialogue!.npcName);
           if (!npc) {
             state.currentDialogue = null;
             return;
@@ -266,10 +147,8 @@ export default function WorldGeneratorPage() {
 
           const nextIndex = state.currentDialogue.index + 1;
           if (nextIndex >= npc.dialogue.length) {
-            // Close dialogue
             state.currentDialogue = null;
           } else {
-            // Show next line
             state.currentDialogue = {
               npcName: npc.name,
               text: npc.dialogue[nextIndex],
@@ -293,7 +172,7 @@ export default function WorldGeneratorPage() {
 
       // Regenerate with R
       if (key === 'r') {
-        regenerateMap();
+        regenerateWorld();
       }
     }
 
@@ -311,10 +190,11 @@ export default function WorldGeneratorPage() {
 
   // Find nearby NPC for interaction
   function findNearbyNPC(state: WorldGenState): NPC | null {
-    const { player, map } = state;
+    const { player, chunkManager } = state;
     const interactionDistance = 1.5;
+    const npcs = chunkManager.getAllLoadedNPCs();
 
-    for (const npc of map.npcs) {
+    for (const npc of npcs) {
       const dx = Math.abs(npc.x - player.x);
       const dy = Math.abs(npc.y - player.y);
       const distance = Math.sqrt(dx * dx + dy * dy);
@@ -332,6 +212,7 @@ export default function WorldGeneratorPage() {
 
     let lastTime = performance.now();
     let animationId: number;
+    let statsUpdateTimer = 0;
 
     function gameLoop() {
       const currentTime = performance.now();
@@ -340,6 +221,20 @@ export default function WorldGeneratorPage() {
 
       update(deltaTime);
       render();
+
+      // Update stats periodically
+      statsUpdateTimer += deltaTime;
+      if (statsUpdateTimer > 500) {
+        statsUpdateTimer = 0;
+        const state = stateRef.current;
+        if (state) {
+          setStats({
+            chunks: state.chunkManager.getLoadedChunkCount(),
+            npcs: state.chunkManager.getAllLoadedNPCs().length,
+            regions: state.chunkManager.getLoadedRegionCount(),
+          });
+        }
+      }
 
       animationId = requestAnimationFrame(gameLoop);
     }
@@ -350,8 +245,11 @@ export default function WorldGeneratorPage() {
 
       animTimeRef.current += deltaTime;
 
+      // Update chunk loading based on player position
+      state.chunkManager.update(state.player.x, state.player.y);
+
       // Update player movement
-      updatePlayerMovement(state.player, state.map, keysRef.current, deltaTime);
+      updatePlayerMovementWorld(state.player, state.chunkManager, keysRef.current, deltaTime);
 
       // Update camera
       updateCamera(state.camera, state.player.x, state.player.y);
@@ -371,13 +269,37 @@ export default function WorldGeneratorPage() {
       // Get camera offset
       const { offsetX, offsetY } = getCameraOffset(state.camera, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-      // Render tiles
-      renderTiles(ctx, atlas, state.map, offsetX, offsetY, CANVAS_WIDTH, CANVAS_HEIGHT);
+      // Get visible chunks
+      const viewportTilesX = Math.ceil(CANVAS_WIDTH / TILE_SIZE) + 2;
+      const viewportTilesY = Math.ceil(CANVAS_HEIGHT / TILE_SIZE) + 2;
+      const visibleChunks = state.chunkManager.getVisibleChunks(
+        state.camera.x,
+        state.camera.y,
+        viewportTilesX,
+        viewportTilesY
+      );
 
-      // Render NPCs (farmers)
+      // Render chunks
+      renderChunks(ctx, atlas, visibleChunks, offsetX, offsetY, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      // Debug: render chunk boundaries
+      if (state.showDebug) {
+        renderChunkDebug(ctx, visibleChunks, offsetX, offsetY);
+      }
+
+      // Render NPCs
       const animFrame = Math.floor(animTimeRef.current / 300) % 2;
-      for (const npc of state.map.npcs) {
+      const npcs = state.chunkManager.getAllLoadedNPCs();
+      for (const npc of npcs) {
         renderEntity(ctx, atlas, npc, offsetX, offsetY, undefined, animFrame);
+
+        // Draw NPC name
+        const screenX = npc.x * TILE_SIZE + offsetX;
+        const screenY = npc.y * TILE_SIZE + offsetY;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(npc.name, screenX + TILE_SIZE / 2, screenY - 4);
       }
 
       // Render player
@@ -388,19 +310,20 @@ export default function WorldGeneratorPage() {
 
       // UI overlay
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(10, 10, 250, 80);
+      ctx.fillRect(10, 10, 280, 100);
       ctx.strokeStyle = '#8844aa';
       ctx.lineWidth = 2;
-      ctx.strokeRect(10, 10, 250, 80);
+      ctx.strokeRect(10, 10, 280, 100);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = '14px monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(`Seed: ${state.seed}`, 20, 32);
-      ctx.fillText(`Farmers: ${state.map.npcs.length}`, 20, 52);
+      ctx.fillText(`Seed: ${state.worldSeed}`, 20, 32);
+      ctx.fillText(`Position: ${Math.floor(state.player.x)}, ${Math.floor(state.player.y)}`, 20, 52);
+      ctx.fillText(`Chunks: ${stats.chunks} | NPCs: ${stats.npcs} | Regions: ${stats.regions}`, 20, 72);
       ctx.fillStyle = '#888888';
       ctx.font = '12px monospace';
-      ctx.fillText('WASD: Move | R: Regenerate', 20, 72);
+      ctx.fillText('WASD: Move | R: Regenerate | F3: Debug', 20, 92);
 
       // Interaction prompt
       if (nearbyNPC && !state.currentDialogue) {
@@ -471,14 +394,14 @@ export default function WorldGeneratorPage() {
 
     animationId = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationId);
-  }, [loading, error]);
+  }, [loading, error, stats]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-zinc-950 text-zinc-400">
         <div className="text-center">
           <div className="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-4" />
-          Loading World Generator...
+          Loading Infinite World Generator...
         </div>
       </div>
     );
@@ -494,7 +417,7 @@ export default function WorldGeneratorPage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 p-4">
-      <h1 className="text-2xl font-bold text-purple-500 mb-4 tracking-wider">World Generator</h1>
+      <h1 className="text-2xl font-bold text-purple-500 mb-4 tracking-wider">Infinite World Generator</h1>
       <canvas
         ref={canvasRef}
         width={CANVAS_WIDTH}
@@ -504,7 +427,7 @@ export default function WorldGeneratorPage() {
       />
       <div className="mt-4 flex gap-4">
         <button
-          onClick={regenerateMap}
+          onClick={regenerateWorld}
           className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors"
         >
           Regenerate (R)
@@ -516,7 +439,8 @@ export default function WorldGeneratorPage() {
       <div className="mt-2 text-zinc-500 text-sm">
         <kbd className="px-2 py-1 bg-zinc-800 rounded text-zinc-300">WASD</kbd> Move |{' '}
         <kbd className="px-2 py-1 bg-zinc-800 rounded text-zinc-300">E</kbd> Interact |{' '}
-        <kbd className="px-2 py-1 bg-zinc-800 rounded text-zinc-300">R</kbd> New World
+        <kbd className="px-2 py-1 bg-zinc-800 rounded text-zinc-300">R</kbd> New World |{' '}
+        <kbd className="px-2 py-1 bg-zinc-800 rounded text-zinc-300">F3</kbd> Debug
       </div>
     </div>
   );

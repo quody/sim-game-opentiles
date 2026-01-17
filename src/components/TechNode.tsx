@@ -1,17 +1,19 @@
 'use client';
 
 import { memo } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { getNodeColor } from '@/lib/graphParser';
 
-interface TechNodeData {
+interface TechNodeData extends Record<string, unknown> {
   label: string;
   className: string;
   group?: string;
   depth?: number;
 }
 
-function TechNode({ data, selected }: NodeProps<TechNodeData>) {
+type TechNodeType = Node<TechNodeData, 'techNode'>;
+
+function TechNode({ data, selected }: NodeProps<TechNodeType>) {
   const color = getNodeColor(data.className);
 
   return (
